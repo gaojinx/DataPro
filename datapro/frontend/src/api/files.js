@@ -1,3 +1,5 @@
+import { authHeaders } from './auth'
+
 const BASE = '/api/v1/files'
 
 async function parse(r) {
@@ -11,29 +13,30 @@ export async function uploadFile({ sessionId, file, origin = 'upload' }) {
   fd.append('file', file)
   fd.append('session_id', sessionId || 'default')
   fd.append('origin', origin)
-  return parse(await fetch(BASE, { method: 'POST', body: fd }))
+  return parse(await fetch(BASE, { method: 'POST', headers: authHeaders(), body: fd }))
 }
 
 export async function listFiles(sessionId) {
-  const r = await fetch(`${BASE}?session_id=${encodeURIComponent(sessionId || 'default')}`)
+  const r = await fetch(`${BASE}?session_id=${encodeURIComponent(sessionId || 'default')}`,
+                        { headers: authHeaders() })
   return (await parse(r)).files
 }
 
 export async function deleteFile(fileId) {
-  return parse(await fetch(`${BASE}/${fileId}`, { method: 'DELETE' }))
+  return parse(await fetch(`${BASE}/${fileId}`, { method: 'DELETE', headers: authHeaders() }))
 }
 
 export const downloadUrl = (fileId) => `${BASE}/${fileId}/download`
 export const inlineUrl = (fileId) => `${BASE}/${fileId}/download?inline=1`
 
 export async function fetchPreview(fileId, limit = 200) {
-  return parse(await fetch(`${BASE}/${fileId}/preview?limit=${limit}`))
+  return parse(await fetch(`${BASE}/${fileId}/preview?limit=${limit}`, { headers: authHeaders() }))
 }
 
 async function lockCall(fileId, owner, action) {
   return parse(await fetch(`${BASE}/${fileId}/${action}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ owner: owner || 'default' }),
   }))
 }

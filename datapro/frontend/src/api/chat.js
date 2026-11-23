@@ -4,13 +4,21 @@
  * 支持 AbortController 中断生成。
  * 事件类型：node / clarify / result / reject / escalate / error
  */
+import { authHeaders, clearAuth } from './auth'
+
 export async function streamChat({ sessionId, message, onEvent, signal }) {
   const resp = await fetch('/api/v1/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ session_id: sessionId, message }),
     signal,
   })
+
+  if (resp.status === 401) {
+    clearAuth()
+    onEvent({ type: 'error', message: '登录已过期，请重新登录', reason_code: 'HTTP' })
+    return
+  }
 
   if (!resp.ok) {
     let detail = `HTTP ${resp.status}`
@@ -45,6 +53,9 @@ export async function streamChat({ sessionId, message, onEvent, signal }) {
 
 export async function sendFeedback(queryId, rating, reason) {
   const q = `rating=${rating}${reason ? `&reason=${encodeURIComponent(reason)}` : ''}`
-  const resp = await fetch(`/api/v1/queries/${queryId}/feedback?${q}`, { method: 'POST' })
+  const resp = await fetch(`/api/v1/queries/${queryId}/feedback?${q}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
   return resp.ok
 }

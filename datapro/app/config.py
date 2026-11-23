@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-chat"
     llm_fallback_model: str = ""
 
+    # 认证（B12 基础版：账号密码 + 签名 Token）
+    auth_secret: str = "datapro-auth-secret-change-me"
+    auth_token_ttl_hours: int = 12
+    auth_seed_admin_password: str = "admin123"
+    auth_seed_user_password: str = "user123"
+
     # 节点超时（秒）
     timeout_clarify: float = 5
     timeout_recall: float = 3

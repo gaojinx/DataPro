@@ -1,10 +1,12 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CopyDocument, DataLine, Delete, Document, Download, Edit, InfoFilled, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, User, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CircleClose, Close, CopyDocument, Cpu, DataAnalysis, DataLine, Delete, Document, Download, Edit, Grid, InfoFilled, Key, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, SwitchButton, User, WarningFilled } from '@element-plus/icons-vue'
 import { sendFeedback, streamChat } from './api/chat'
 import { deleteApi, fetchApis, fetchLlmStatus, saveApi, setDefaultApi, testApi } from './api/admin'
 import { deleteFile, downloadUrl, fetchPreview, inlineUrl, listFiles, lockFile, unlockFile, uploadFile } from './api/files'
+import { getUser, logout as apiLogout } from './api/auth'
+import LoginView from './components/LoginView.vue'
 
 // Univer 体积较大，仅在打开编辑器时按需加载
 const UniverSheet = defineAsyncComponent(() => import('./editor/UniverSheet.vue'))
@@ -82,9 +84,32 @@ const NODE_LABELS = {
   VALIDATE: '校验语句', EXECUTE: '执行查询', PRESENT: '整理结果', DONE: '完成',
 }
 
-// ---- 账户角色（F17；骨架本地角色，正式 RBAC 见 B12） ----
-const role = ref(localStorage.getItem('dp_role') || 'admin')   // admin | user
+// ---- 登录态（B12：Token + 角色由后端签发） ----
+const authUser = ref(getUser())
+const role = computed(() => authUser.value?.role === 'admin' ? 'admin' : 'user')
 const roleName = computed(() => role.value === 'admin' ? '管理员' : '普通用户')
+const displayName = computed(() => authUser.value?.display_name || authUser.value?.username || '未登录')
+
+function onLogin(user) {
+  authUser.value = user
+  loadLlmStatus()
+  if (user.role === 'admin') loadApis()
+}
+
+async function doLogout() {
+  controller.value?.abort()
+  accountMenuOpen.value = false
+  await apiLogout()
+  authUser.value = null
+  sessions.value = []
+  messages.value = []
+  pendingFiles.value = []
+  files.value = []
+  sessionId.value = ''
+  activeId.value = ''
+  localStorage.removeItem(STORAGE_KEY)
+  sidebarOpen.value = false
+}
 
 const activeTitle = computed(() => {
   if (activeView.value === 'settings') return '设置'
@@ -93,10 +118,10 @@ const activeTitle = computed(() => {
 const showHero = computed(() => !busy.value && messages.value.length === 0)
 
 const HERO_CARDS = [
-  { t: '查昨天的支付订单数', b: '口径 M003', icon: '∑' },
-  { t: '本周每个品类的销量', b: '分组汇总', icon: '◫' },
-  { t: '支付订单数的口径是什么', b: '元数据', icon: '◈' },
-  { t: '把订单价格都改一下', b: '越界演示', icon: '⛔', danger: true },
+  { t: '查昨天的支付订单数', b: '口径 M003', icon: DataAnalysis },
+  { t: '本周每个品类的销量', b: '分组汇总', icon: Grid },
+  { t: '支付订单数的口径是什么', b: '元数据', icon: InfoFilled },
+  { t: '把订单价格都改一下', b: '越界演示', icon: CircleClose, danger: true },
 ]
 
 // 智能粘底：用户上翻浏览时不强制打断
@@ -123,8 +148,11 @@ const scrollToBottom = async (force = false) => {
 onMounted(() => {
   applyTheme()
   loadSessions()
-  loadLlmStatus()   // 顶栏/composer 模型 chip
+  if (authUser.value) loadLlmStatus()   // 顶栏/composer 模型 chip
   window.addEventListener('keydown', onGlobalKey)
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.account-wrap')) accountMenuOpen.value = false
+  })
 })
 
 function newChat() {
@@ -752,6 +780,8 @@ function onGlobalKey(e) {
     panelOpen.value = true
     panelTab.value = 'search'
     localStorage.setItem('dp_panel', 'open')
+  } else if (e.key === 'Escape' && accountMenuOpen.value) {
+    accountMenuOpen.value = false
   } else if (e.key === 'Escape' && panelOpen.value) {
     panelOpen.value = false
     localStorage.setItem('dp_panel', 'closed')
@@ -798,6 +828,14 @@ const SETTINGS_TABS = [
 ]
 const settingsTitle = computed(
   () => SETTINGS_TABS.find(t => t.k === settingsTab.value)?.label || '设置')
+
+// ---- 账户二级菜单：管理员专属入口在头像菜单内，点击后进入主区视图 ----
+const accountMenuOpen = ref(false)
+function openAccountView(tab) {
+  accountMenuOpen.value = false
+  settingsTab.value = tab
+  openView('settings')
+}
 
 function hostOf(url) {
   try { return new URL(url).host } catch { return url || '—' }
@@ -871,12 +909,6 @@ async function runTest(row) {
   finally { testingId.value = null }
 }
 
-function switchRole(r) {
-  role.value = r
-  localStorage.setItem('dp_role', r)
-  ElMessage.success(`已切换为${r === 'admin' ? '管理员' : '普通用户'}（开发模式模拟）`)
-}
-
 // ---- 顶栏/composer 模型选择器（F20，联动 B16） ----
 const modelMenuOpen = ref(false)
 async function onModelMenu(visible) {
@@ -894,7 +926,8 @@ async function onPickModel(row) {
 </script>
 
 <template>
-  <div class="shell" :class="{ 'sidebar-open': sidebarOpen, 'sidebar-collapsed': sidebarCollapsed }">
+  <LoginView v-if="!authUser" @success="onLogin" />
+  <div v-else class="shell" :class="{ 'sidebar-open': sidebarOpen, 'sidebar-collapsed': sidebarCollapsed }">
     <!-- 左侧会话栏（Codex 式：品牌/新对话/日期分组/账户区） -->
     <aside class="sidebar">
       <div class="brand">
@@ -908,9 +941,6 @@ async function onPickModel(row) {
       <div class="nav-list">
         <div class="nav-item" :class="{ active: activeView === 'chat' }" @click="openView('chat')">
           <el-icon><ChatDotSquare /></el-icon> 对话
-        </div>
-        <div class="nav-item" :class="{ active: activeView === 'settings' }" @click="openView('settings')">
-          <el-icon><Setting /></el-icon> 设置
         </div>
       </div>
       <div class="session-list">
@@ -928,27 +958,59 @@ async function onPickModel(row) {
               <span class="session-ts">{{ fmtTime(s.ts) }}</span>
             </template>
             <button v-if="renamingId !== s.id" class="session-act" title="重命名"
-                    @click.stop="startRename(s)">✎</button>
+                    @click.stop="startRename(s)"><el-icon><Edit /></el-icon></button>
             <button class="del" :class="{ confirm: confirmDelId === s.id }"
-                    :title="confirmDelId === s.id ? '再点一次确认删除' : '删除会话'"
+                    :title="confirmDelId === s.id ? '再次点击确认' : '删除会话'"
                     @click.stop="deleteSession(s.id, $event)">
-              {{ confirmDelId === s.id ? '确认' : '✕' }}
+              <span v-if="confirmDelId === s.id">确认</span>
+              <el-icon v-else><Close /></el-icon>
             </button>
           </div>
         </template>
         <div v-if="!sessions.length" class="empty-hint">暂无历史对话</div>
       </div>
-      <div class="account-bar">
-        <div class="account-info">
-          <div class="account-avatar"><el-icon><User /></el-icon></div>
-          <div>
-            <div class="account-name">数据用户</div>
-            <div class="account-role">{{ roleName }}</div>
+      <div class="account-wrap">
+        <transition name="menu-pop">
+          <div v-if="accountMenuOpen" class="account-menu" @click.stop>
+            <div class="am-group">通用</div>
+            <button class="am-item" @click="openAccountView('appearance')">
+              <el-icon><Sunny /></el-icon>外观风格
+            </button>
+            <button class="am-item" @click="openAccountView('account')">
+              <el-icon><User /></el-icon>账户与统计
+            </button>
+            <template v-if="role === 'admin'">
+              <div class="am-sep" />
+              <div class="am-group admin"><el-icon><Lock /></el-icon>管理员</div>
+              <button class="am-item" @click="openAccountView('model')">
+                <el-icon><Key /></el-icon>API 管理
+              </button>
+              <button class="am-item" @click="openAccountView('datasource')">
+                <el-icon><DataLine /></el-icon>数据源
+              </button>
+              <button class="am-item" @click="openAccountView('role')">
+                <el-icon><Lock /></el-icon>权限与角色
+              </button>
+            </template>
           </div>
+        </transition>
+        <div class="account-bar" :class="{ open: accountMenuOpen }">
+          <button class="account-main" @click.stop="accountMenuOpen = !accountMenuOpen">
+            <div class="account-info">
+              <div class="account-avatar"><el-icon><User /></el-icon></div>
+              <div class="account-meta">
+                <div class="account-name">
+                  {{ displayName }}<span v-if="role === 'admin'" class="admin-dot" title="管理员" />
+                </div>
+                <div class="account-role">{{ roleName }}</div>
+              </div>
+            </div>
+            <el-icon class="account-chevron"><ArrowUp /></el-icon>
+          </button>
+          <button class="account-logout" title="退出登录" @click.stop="doLogout">
+            <el-icon><SwitchButton /></el-icon>
+          </button>
         </div>
-        <button class="icon-btn" title="设置" @click="openView('settings')">
-          <el-icon><Setting /></el-icon>
-        </button>
       </div>
     </aside>
     <div class="scrim" @click="sidebarOpen = false" />
@@ -963,7 +1025,7 @@ async function onPickModel(row) {
           <!-- 模型选择器（Codex 顶栏位） -->
           <el-dropdown trigger="click" @visible-change="onModelMenu">
             <span class="model-chip" :class="{ user: role !== 'admin' }">
-              ⚡ {{ llmStatus?.default_model || '未配置' }}
+              <el-icon><Cpu /></el-icon> {{ llmStatus?.default_model || '未配置' }}
               <el-icon v-if="role === 'admin'"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -989,11 +1051,11 @@ async function onPickModel(row) {
         <div class="status">
           <span class="chip green">只读模式</span>
           <span class="chip">{{ busy ? '处理中…' : '就绪' }}</span>
-          <button class="icon-btn" :class="{ active: panelOpen }" title="文件与搜索面板（Ctrl+K 搜索）"
+          <button class="icon-btn" :class="{ active: panelOpen }" title="文件与搜索（Ctrl+K）"
                   @click="togglePanel()">
             <el-icon><Document /></el-icon>
           </button>
-          <button class="icon-btn" title="导出本会话 Markdown" @click="exportMarkdown">
+          <button class="icon-btn" title="导出 Markdown" @click="exportMarkdown">
             <el-icon><Download /></el-icon>
           </button>
           <button class="icon-btn" :title="theme === 'light' ? '切换暗色' : '切换亮色'" @click="toggleTheme">
@@ -1017,7 +1079,7 @@ async function onPickModel(row) {
           <div class="hero-cards">
             <div v-for="c in HERO_CARDS" :key="c.t" class="hero-card" @click="send(c.t)">
               <div class="hero-card-head">
-                <span class="hero-card-icon" :class="{ danger: c.danger }">{{ c.icon }}</span>
+                <span class="hero-card-icon" :class="{ danger: c.danger }"><el-icon><component :is="c.icon" /></el-icon></span>
                 <span class="hero-card-badge" :class="{ danger: c.danger }">{{ c.b }}</span>
               </div>
               <div class="t">{{ c.t }}</div>
@@ -1156,15 +1218,15 @@ async function onPickModel(row) {
                 <!-- 反馈 -->
                 <div v-if="(msg.result || msg.reject) && !msg.running" class="feedback-bar">
                   <button class="fb-btn" :class="{ 'on-up': msg.feedback === 'up' }"
-                          title="结果准确" @click="clickFeedback(msg, 'up')">👍</button>
+                          title="结果准确" @click="clickFeedback(msg, 'up')"><el-icon><CircleCheck /></el-icon></button>
                   <button class="fb-btn" :class="{ 'on-down': msg.feedback === 'down' }"
-                          title="结果不对" @click="clickFeedback(msg, 'down')">👎</button>
-                  <span class="note" data-tip="AI 生成结果可能存在偏差，重要决策请人工复核">
+                          title="结果不对" @click="clickFeedback(msg, 'down')"><el-icon><CircleClose /></el-icon></button>
+                  <span class="note" data-tip="结果需人工复核">
                     <el-icon><Lock /></el-icon> AI 生成
                   </span>
                 </div>
                 <div v-if="reasonFor === msg" class="reason-panel">
-                  <span style="width:100%;color:var(--muted)">请选择问题类型：</span>
+                  <span style="width:100%;color:var(--muted)">问题类型</span>
                   <button v-for="r in REASONS" :key="r" class="opt" @click="submitReason(r)">{{ r }}</button>
                 </div>
               </div>
@@ -1186,22 +1248,22 @@ async function onPickModel(row) {
           <div v-if="pendingFiles.length" class="pending-files">
             <span v-for="(f, idx) in pendingFiles" :key="f.file_id" class="pending-chip">
               {{ fileIcon(f) }} {{ f.name }}
-              <button class="chip-x" @click="dropPending(idx)">✕</button>
+              <button class="chip-x" @click="dropPending(idx)"><el-icon><Close /></el-icon></button>
             </span>
           </div>
           <textarea ref="taRef" v-model="input" rows="1" :disabled="busy"
                     placeholder="问点什么，或拖入文件"
                     @keydown="onKeydown" @input="autoResize" />
           <div class="composer-bottom">
-            <button class="attach-btn" :disabled="uploading" title="上传文件（也可直接拖入）" @click="pickFile">
+            <button class="attach-btn" :disabled="uploading" title="上传文件" @click="pickFile">
               <el-icon><Paperclip /></el-icon>
             </button>
             <input ref="fileInput" type="file" multiple hidden @change="onFileChange" />
             <span class="composer-model" :class="{ user: role !== 'admin' }"
                   :title="role === 'admin' ? '在顶栏可切换默认模型' : '由管理员统一配置'">
-              ⚡ {{ llmStatus?.default_model || '未配置' }}
+              <el-icon><Cpu /></el-icon> {{ llmStatus?.default_model || '未配置' }}
             </span>
-            <span class="secure-mark" data-tip="AI 生成结果可能存在偏差，重要决策请人工复核">
+            <span class="secure-mark" data-tip="结果需人工复核">
               <el-icon><Lock /></el-icon>
             </span>
             <button v-if="busy" class="send-btn stop" title="停止生成" @click="stop">
@@ -1309,10 +1371,10 @@ async function onPickModel(row) {
           </div>
 
           <!-- 模型与AI -->
-          <div v-if="settingsTab === 'model'" class="model-card">
+          <div v-if="settingsTab === 'model'" class="model-card tab-panel">
             <div class="model-card-head">
               <div class="model-card-title">
-                <span class="model-ico">◈</span>
+                <span class="model-ico"><el-icon><Cpu /></el-icon></span>
                 <div>
                   <b>AI 大模型</b>
                 </div>
@@ -1389,10 +1451,10 @@ async function onPickModel(row) {
           </div>
 
           <!-- 数据源 -->
-          <div v-else-if="settingsTab === 'datasource'" class="model-card">
+          <div v-else-if="settingsTab === 'datasource'" class="model-card tab-panel">
             <div class="model-card-head">
               <div class="model-card-title">
-                <span class="model-ico">▤</span>
+                <span class="model-ico"><el-icon><DataLine /></el-icon></span>
                 <div><b>数据源</b></div>
               </div>
             </div>
@@ -1424,10 +1486,10 @@ async function onPickModel(row) {
           </div>
 
           <!-- 外观风格 -->
-          <div v-else-if="settingsTab === 'appearance'" class="model-card">
+          <div v-else-if="settingsTab === 'appearance'" class="model-card tab-panel">
             <div class="model-card-head">
               <div class="model-card-title">
-                <span class="model-ico">◐</span>
+                <span class="model-ico"><el-icon><Sunny /></el-icon></span>
                 <div><b>外观风格</b></div>
               </div>
             </div>
@@ -1441,33 +1503,38 @@ async function onPickModel(row) {
           </div>
 
           <!-- 权限与角色 -->
-          <div v-else-if="settingsTab === 'role'" class="model-card">
+          <div v-else-if="settingsTab === 'role'" class="model-card tab-panel">
             <div class="model-card-head">
               <div class="model-card-title">
-                <span class="model-ico">◇</span>
+                <span class="model-ico"><el-icon><Lock /></el-icon></span>
                 <div><b>权限与角色</b></div>
               </div>
             </div>
             <div class="settings-row">
-              <span>当前角色</span>
-              <div class="row-side">
-                <span class="pill-neutral">开发模式</span>
-                <el-radio-group :model-value="role" @update:model-value="switchRole">
-                  <el-radio-button value="admin">管理员</el-radio-button>
-                  <el-radio-button value="user">普通用户</el-radio-button>
-                </el-radio-group>
-              </div>
+              <span>登录账号</span>
+              <b>{{ authUser?.username }}</b>
+            </div>
+            <div class="settings-row">
+              <span>角色</span>
+              <span class="pill-current">{{ roleName }}</span>
+            </div>
+            <div class="settings-row">
+              <span>登录状态</span>
+              <button class="model-act" @click="doLogout">
+                <el-icon><SwitchButton /></el-icon>退出登录
+              </button>
             </div>
           </div>
 
           <!-- 账户与统计 -->
-          <div v-else class="model-card">
+          <div v-else class="model-card tab-panel">
             <div class="model-card-head">
               <div class="model-card-title">
-                <span class="model-ico">◎</span>
+                <span class="model-ico"><el-icon><User /></el-icon></span>
                 <div><b>账户与统计</b></div>
               </div>
             </div>
+            <div class="settings-row"><span>登录账号</span><b>{{ authUser?.username }}</b></div>
             <div class="settings-row"><span>当前角色</span><b>{{ roleName }}</b></div>
             <div class="settings-row"><span>本地会话</span><b>{{ sessions.length }} 个</b></div>
             <div class="settings-row"><span>模型状态</span><b>{{ llmStatus?.available ? llmStatus.default_model : '示例模式' }}</b></div>
@@ -1488,13 +1555,13 @@ async function onPickModel(row) {
         <button class="panel-tab" :class="{ active: panelTab === 'search' }" @click="panelTab = 'search'">
           <el-icon><Search /></el-icon> 搜索
         </button>
-        <button class="panel-close" title="关闭（Esc）" @click="togglePanel()">✕</button>
+        <button class="panel-close" title="关闭（Esc）" @click="togglePanel()"><el-icon><Close /></el-icon></button>
       </div>
 
       <!-- 文件 Tab：本会话上传 + 生成 -->
       <div v-if="panelTab === 'files'" class="panel-body">
         <button class="panel-upload" :disabled="uploading" @click="pickFile">
-          {{ uploading ? '上传中…' : '＋ 上传文件' }}
+          {{ uploading ? '上传中' : '上传文件' }}
         </button>
         <div class="panel-filters">
           <button v-for="sc in fileScopes" :key="sc.k" class="scope-chip"
@@ -1523,7 +1590,7 @@ async function onPickModel(row) {
           <a class="file-act" :href="downloadUrl(f.file_id)" :download="f.name" title="下载">
             <el-icon><Download /></el-icon>
           </a>
-          <button class="file-act" title="删除" @click="removeFile(f)">✕</button>
+          <button class="file-act" title="删除" @click="removeFile(f)"><el-icon><Close /></el-icon></button>
         </div>
       </div>
 

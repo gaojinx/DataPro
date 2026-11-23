@@ -37,7 +37,7 @@ intent_service = IntentService()
 class AnswerService:
     """PRESENT / 元数据问答节点。骨架返回模板话术；接 LLM 后走 answer.txt / meta_qa.txt。"""
 
-    AI_DISCLAIMER = "以上为 AI 生成结果，重要决策请人工复核。"
+    AI_DISCLAIMER = "结果需人工复核。"
 
     async def summarize(self, ctx: PipelineContext) -> str:
         r = ctx.result

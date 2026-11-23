@@ -21,6 +21,7 @@
 | 业务库 | MySQL `datapro` | 账号 `datapro/pw`；存 query_record / audit_log 等 |
 | 上传临时库 | MySQL `dp_uploads` | 会话文件解析成 `f_{file_id}` 表（多 sheet 为 `_s2`…） |
 | LLM | openai 兼容 SDK | 支持 DeepSeek/Qwen 等；注册表 JSON 持久化 |
+| 认证 | PBKDF2 密码哈希 + HMAC 签名 Token | B12 基础版；角色 admin/user；Token 默认 12h |
 
 ## 3. 目录结构
 
@@ -34,19 +35,19 @@ AgentProject/
    │  ├─ main.py               # FastAPI 入口 + trace 中间件 + 启动建表
    │  ├─ config.py             # pydantic-settings，全部配置走环境变量
    │  ├─ prompts.py            # Prompt 加载
-   │  ├─ api/                  # routes_chat（SSE）/ routes_admin / routes_files
+   │  ├─ api/                  # routes_chat（SSE）/ routes_admin / routes_files / routes_auth
    │  ├─ core/                 # statemachine（9 节点）/ errors（E001~E010）/ trace
    │  ├─ db/                   # models（session/message/query_record/audit_log/metric_caliber）/ session
    │  ├─ llm/                  # client（超时/JSON 容错/备用模型）/ tools
    │  └─ services/             # intent / recall / generator / validator / executor /
    │                           # answer / file_store / file_ingest / db_identity /
-   │                           # session_registry / session_janitor / llm_registry / audit / persist
+   │                           # session_registry / session_janitor / llm_registry / audit / persist / auth
    ├─ worker/inspection_worker.py  # 每日 06:00 巡检 + 每小时会话回收
    ├─ eval/                    # runner（分类指标）+ datasets/eval_v1_seed.jsonl
    ├─ prompts/                 # intent / clarify / sql_gen / sql_fix / answer / meta_qa / reject
    ├─ tests/                   # 5 个测试文件，29 项
    ├─ frontend/                # Vue3 + Vite
-   │  └─ src/{App.vue, main.js, style.css, api/{chat,admin,files}.js, editor/UniverSheet.vue}
+   │  └─ src/{App.vue, main.js, style.css, api/{chat,admin,files,auth}.js, components/LoginView.vue, editor/UniverSheet.vue}
    ├─ data/                    # 运行数据（上传文件、llm_apis.json），已 gitignore
    ├─ .tmp/                    # 构建/临时目录，已 gitignore
    └─ pyproject.toml / docker-compose.yml / .env.example
@@ -62,7 +63,8 @@ AgentProject/
 - **只读执行**：sqlglot 校验（写操作/表白名单/危险函数/LIMIT）+ 只读账号 + 会话身份透传 + 超时 + 行数截断 + 日期占位符 `{date}`/`{start_date}`/`{end_date}`。
 - **文件能力（F27）**：CSV/TSV/JSON/XLSX 上传 → 解析（多 sheet）→ 临时表 → 可查询；2 万行 × 50 列；列名 `c1..cn` + 原始表头注入 prompt。
 - **会话隔离安全**：每会话一个 MySQL 只读账号，按表授权；共享 `ro` 的 `dp_uploads` 整库权限已回收；删除/过期 DROP 表 + REVOKE + DROP USER。
-- **管理能力**：LLM API 注册表（增删改/测试/设默认/Key 脱敏），仅管理员；本地角色模拟（正式 RBAC 待 B12）。
+- **管理能力**：LLM API 注册表（增删改/测试/设默认/Key 脱敏），仅管理员（Token 角色校验）。
+- **登录与鉴权（B12 基础版）**：独立登录页；PBKDF2 密码哈希；HMAC 签名 Token（默认 12h）；管理接口校验管理员角色；聊天/反馈/会话接口要求登录；会话按创建者归属。演示账号 `admin/admin123`、`analyst/user123`。
 - **前端体验**：Codex 式侧栏（日期分组/折叠/重命名/删除确认）、无弹窗主区视图、右侧文件与搜索面板、文件来源筛选、消息复制/重生成、导出 MD/CSV、Ctrl+K、暗色主题。
 - **二级设置页（F37）**：横向分组标签（数据源 / 模型与AI / 外观风格 / 权限与角色 / 账户与统计）；模型表格列为名称/Base URL/模型/API Key/操作，支持设为当前、测试连接、编辑、删除；添加/编辑为内联表单（无弹窗）。
 - **文件预览（F34）**：文件面板或消息附件点击进入主区预览；表格按工作表切换（前 200 行，数据来自解析临时表），图片/PDF 内联渲染；接口 `GET /api/v1/files/{id}/preview` 与 `download?inline=1`。
@@ -132,13 +134,14 @@ curl.exe -s http://127.0.0.1:8100/health
 - **前端构建包体告警**：主包约 1.1 MB（Element Plus 全量引入）；Univer 编辑器为独立异步 chunk（约 6.8 MB / gzip 1.7 MB），只在打开 CSV/TSV 编辑时加载，属预期。
 - **在线编辑限制**：CSV/TSV/XLSX；单表 ≤ 5000 行、总计 ≤ 10000 行；XLSX 用 SheetJS 转换，样式/公式/图表会丢失；Univer 官方 xlsx 导入导出属 Pro，不使用；编辑锁为进程内实现，仅适合单实例部署（多实例需 Redis，见 B11）。
 - **SheetJS 版本**：npm 社区版 0.18.5 存在已知安全告警，仅用于处理当前会话的用户文件；后续可评估升级到官方 CDN 版本或服务端转换。
+- **登录为演示账号**：`admin/admin123`、`analyst/user123` 仅首次启动写入，生产必须改密并替换 `AUTH_SECRET`；Token 无黑名单，退出只清客户端；文件预览/下载接口尚未接入 Token。
 - **上传表生命周期**：会话 TTL 默认 24h，每小时 janitor 回收账号与临时表；删除文件同步 DROP/REVOKE。
 - **Python 3.14 兼容**：pymysql 需 `cryptography`（已在依赖中）。
 
 ## 7. 待办
 
 - **P0**：真实 LLM Key 联调与回归评测（B09/E04）；元数据字典实填（D02，依赖业务方）；评测集扩充到 50 条（E03）。
-- **P1**：`sql_fix` 接真实 LLM（B10）；Redis 会话上下文（B11）；JWT + RBAC（B12）；限流 E007（B14）；列级存在性校验（A03）；向量召回 + Rerank（A05）；小基数 GROUP BY 防泄露（A07）。
+- **P1**：`sql_fix` 接真实 LLM（B10）；Redis 会话上下文（B11）；B12 剩余（用户管理、权限矩阵、Token 刷新/黑名单、文件接口接入 Token）；限流 E007（B14）；列级存在性校验（A03）；向量召回 + Rerank（A05）；小基数 GROUP BY 防泄露（A07）。
 - **P2**：巡检结果页（F16）；导出任务队列与审批（B13/F11）；返回层脱敏拦截（S04）；前端水印（S06）；日终种子日期自动对齐。
 - **文件编辑路线（不使用 Univer Pro）**：P1 只读预览、P2 CSV/TSV 编辑、P3 XLSX 多表编辑均已完成；图片/PDF 只读预览已在 P1 覆盖。后续可选：版本链/回滚、编辑历史对比。
 
