@@ -1,7 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CopyDocument, DataLine, Document, Download, InfoFilled, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, User, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CopyDocument, DataLine, Delete, Document, Download, Edit, InfoFilled, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, User, WarningFilled } from '@element-plus/icons-vue'
 import { sendFeedback, streamChat } from './api/chat'
 import { deleteApi, fetchApis, fetchLlmStatus, saveApi, setDefaultApi, testApi } from './api/admin'
 import { deleteFile, downloadUrl, fetchPreview, inlineUrl, listFiles, lockFile, unlockFile, uploadFile } from './api/files'
@@ -787,6 +787,22 @@ function openView(view) {
   }
 }
 
+// ---- 二级设置页（参考 Codex/WorkBuddy 设置中心：横向分组 + 卡片式内容） ----
+const settingsTab = ref('model')   // datasource | model | appearance | role | account
+const SETTINGS_TABS = [
+  { k: 'datasource', label: '数据源' },
+  { k: 'model', label: '模型与AI' },
+  { k: 'appearance', label: '外观风格' },
+  { k: 'role', label: '权限与角色' },
+  { k: 'account', label: '账户与统计' },
+]
+const settingsTitle = computed(
+  () => SETTINGS_TABS.find(t => t.k === settingsTab.value)?.label || '设置')
+
+function hostOf(url) {
+  try { return new URL(url).host } catch { return url || '—' }
+}
+
 async function loadLlmStatus() {
   try { llmStatus.value = await fetchLlmStatus() } catch { llmStatus.value = null }
 }
@@ -1271,99 +1287,193 @@ async function onPickModel(row) {
         </div>
       </el-scrollbar>
 
-      <!-- 设置视图（F21：无弹窗，Codex 式页面视图） -->
+      <!-- 设置视图（F21/F37：无弹窗，二级设置页） -->
       <el-scrollbar v-else-if="activeView === 'settings'" class="thread-scroll">
-        <div class="page-view">
-          <h2 class="page-title">设置</h2>
+        <div class="page-view settings-view">
+          <div class="settings-head">
+            <div class="settings-head-ico"><el-icon><Setting /></el-icon></div>
+            <div class="settings-head-main">
+              <h2 class="settings-title">设置 · {{ settingsTitle }}</h2>
+            </div>
+            <div v-if="llmStatus" class="settings-state">
+              <span class="state-dot" :class="{ on: llmStatus.available }"></span>
+              {{ llmStatus.available ? llmStatus.default_model : '示例模式' }}
+            </div>
+          </div>
 
-          <!-- 通用 -->
-          <div class="page-section">
-            <div class="section-title">通用</div>
+          <div class="settings-tabs">
+            <button v-for="t in SETTINGS_TABS" :key="t.k" class="settings-tab"
+                    :class="{ active: settingsTab === t.k }" @click="settingsTab = t.k">
+              {{ t.label }}
+            </button>
+          </div>
+
+          <!-- 模型与AI -->
+          <div v-if="settingsTab === 'model'" class="model-card">
+            <div class="model-card-head">
+              <div class="model-card-title">
+                <span class="model-ico">◈</span>
+                <div>
+                  <b>AI 大模型</b>
+                </div>
+              </div>
+              <button v-if="role === 'admin'" class="btn-dark" @click="newApi">
+                <el-icon><Plus /></el-icon> 添加模型
+              </button>
+            </div>
+
+            <div v-if="showApiForm && role === 'admin'" class="inline-form">
+              <div class="inline-form-title">{{ apiForm.id ? `编辑模型：${apiForm.name}` : '添加模型' }}</div>
+              <el-form label-width="90px">
+                <el-form-item label="名称"><el-input v-model="apiForm.name" placeholder="如：DeepSeek 官方" /></el-form-item>
+                <el-form-item label="Base URL"><el-input v-model="apiForm.base_url" placeholder="https://api.deepseek.com/v1" /></el-form-item>
+                <el-form-item label="模型"><el-input v-model="apiForm.model" placeholder="如：deepseek-chat" /></el-form-item>
+                <el-form-item label="API Key">
+                  <el-input v-model="apiForm.api_key" type="password" show-password
+                            :placeholder="apiForm.id ? '留空表示不修改' : 'sk-...'" />
+                </el-form-item>
+                <el-form-item label="启用"><el-switch v-model="apiForm.enabled" /></el-form-item>
+              </el-form>
+              <div class="inline-form-actions">
+                <el-button size="small" @click="showApiForm = false">取消</el-button>
+                <el-button size="small" type="primary" @click="submitApi">保存</el-button>
+              </div>
+            </div>
+
+            <table class="model-table">
+              <thead>
+                <tr>
+                  <th>名称</th><th>Base URL</th><th>模型</th><th>API Key</th><th class="ta-r">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in apiList" :key="row.id">
+                  <td>
+                    <div class="model-name">
+                      <b>{{ row.name }}</b>
+                      <span v-if="row.is_default" class="pill-current">当前</span>
+                      <span v-if="!row.enabled" class="pill-off">已停用</span>
+                    </div>
+                    <div class="model-provider">{{ hostOf(row.base_url) }}</div>
+                  </td>
+                  <td class="model-mono model-ellipsis" :title="row.base_url">{{ row.base_url }}</td>
+                  <td class="model-mono">{{ row.model }}</td>
+                  <td class="model-mono model-key">{{ row.key_masked }}</td>
+                  <td>
+                    <div v-if="role === 'admin'" class="model-actions">
+                      <button v-if="!row.is_default" class="model-act" @click="makeDefault(row)">
+                        <el-icon><CircleCheck /></el-icon>设为当前
+                      </button>
+                      <button class="model-act" :disabled="testingId === row.id" @click="runTest(row)">
+                        <el-icon><Refresh /></el-icon>{{ testingId === row.id ? '测试中…' : '测试连接' }}
+                      </button>
+                      <button class="model-act" @click="editApi(row)"><el-icon><Edit /></el-icon>编辑</button>
+                      <button class="model-act danger" @click="removeApi(row)">
+                        <el-icon><Delete /></el-icon>{{ deletingId === row.id ? '确认删除' : '删除' }}
+                      </button>
+                    </div>
+                    <el-icon v-else class="lock-hint" title="仅管理员可管理"><Lock /></el-icon>
+                    <div v-if="row.lastTest" class="model-test">{{ row.lastTest }}</div>
+                  </td>
+                </tr>
+                <tr v-if="!apiList.length">
+                  <td colspan="5" class="model-empty">
+                    <button v-if="role === 'admin'" class="model-act" @click="newApi">
+                      <el-icon><Plus /></el-icon>添加模型
+                    </button>
+                    <span v-else>—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 数据源 -->
+          <div v-else-if="settingsTab === 'datasource'" class="model-card">
+            <div class="model-card-head">
+              <div class="model-card-title">
+                <span class="model-ico">▤</span>
+                <div><b>数据源</b></div>
+              </div>
+            </div>
+            <div class="ds-list">
+              <div class="ds-row">
+                <b>dwd_shop</b>
+                <div class="ds-tags">
+                  <span class="pill-neutral">MySQL 8.0</span>
+                  <span class="pill-neutral">数仓</span>
+                  <span class="pill-lock"><el-icon><Lock /></el-icon>只读</span>
+                </div>
+              </div>
+              <div class="ds-row">
+                <b>datapro</b>
+                <div class="ds-tags">
+                  <span class="pill-neutral">MySQL</span>
+                  <span class="pill-neutral">业务库</span>
+                </div>
+              </div>
+              <div class="ds-row">
+                <b>dp_uploads</b>
+                <div class="ds-tags">
+                  <span class="pill-neutral">MySQL</span>
+                  <span class="pill-neutral">临时</span>
+                  <span class="pill-neutral">24h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 外观风格 -->
+          <div v-else-if="settingsTab === 'appearance'" class="model-card">
+            <div class="model-card-head">
+              <div class="model-card-title">
+                <span class="model-ico">◐</span>
+                <div><b>外观风格</b></div>
+              </div>
+            </div>
             <div class="settings-row">
               <span>界面主题</span>
               <el-radio-group :model-value="theme" @update:model-value="toggleTheme">
-                <el-radio-button value="light">☀️ 亮色</el-radio-button>
-                <el-radio-button value="dark">🌙 暗色</el-radio-button>
+                <el-radio-button value="light">亮色</el-radio-button>
+                <el-radio-button value="dark">暗色</el-radio-button>
               </el-radio-group>
+            </div>
+          </div>
+
+          <!-- 权限与角色 -->
+          <div v-else-if="settingsTab === 'role'" class="model-card">
+            <div class="model-card-head">
+              <div class="model-card-title">
+                <span class="model-ico">◇</span>
+                <div><b>权限与角色</b></div>
+              </div>
             </div>
             <div class="settings-row">
-              <span>当前角色（开发模式模拟，正式版由登录决定）</span>
-              <el-radio-group :model-value="role" @update:model-value="switchRole">
-                <el-radio-button value="admin">管理员</el-radio-button>
-                <el-radio-button value="user">普通用户</el-radio-button>
-              </el-radio-group>
+              <span>当前角色</span>
+              <div class="row-side">
+                <span class="pill-neutral">开发模式</span>
+                <el-radio-group :model-value="role" @update:model-value="switchRole">
+                  <el-radio-button value="admin">管理员</el-radio-button>
+                  <el-radio-button value="user">普通用户</el-radio-button>
+                </el-radio-group>
+              </div>
             </div>
           </div>
 
-          <!-- 模型服务 -->
-          <div class="page-section">
-            <div class="section-title">模型服务</div>
-            <template v-if="role === 'admin'">
-              <div class="api-toolbar">
-                <el-icon class="muted"><Lock /></el-icon>
-                <el-button type="primary" size="small" :icon="Plus" @click="newApi">新增 API</el-button>
+          <!-- 账户与统计 -->
+          <div v-else class="model-card">
+            <div class="model-card-head">
+              <div class="model-card-title">
+                <span class="model-ico">◎</span>
+                <div><b>账户与统计</b></div>
               </div>
-
-              <el-alert v-if="llmStatus && !llmStatus.available" type="warning" :closable="false"
-                        show-icon style="margin-bottom:10px"
-                        title="尚未配置 API Key，当前为示例模式（返回固定示例查询）。填写 Key 并设为默认后立即生效，无需重启。" />
-
-              <!-- 内联新增/编辑表单（无弹窗） -->
-              <div v-if="showApiForm" class="inline-form">
-                <div class="inline-form-title">{{ apiForm.id ? `编辑 API：${apiForm.name}` : '新增 API' }}</div>
-                <el-form label-width="90px">
-                  <el-form-item label="名称"><el-input v-model="apiForm.name" placeholder="如：DeepSeek 官方" /></el-form-item>
-                  <el-form-item label="Base URL"><el-input v-model="apiForm.base_url" placeholder="https://api.deepseek.com/v1" /></el-form-item>
-                  <el-form-item label="模型"><el-input v-model="apiForm.model" placeholder="如：deepseek-chat" /></el-form-item>
-                  <el-form-item label="API Key">
-                    <el-input v-model="apiForm.api_key" type="password" show-password
-                              :placeholder="apiForm.id ? '留空表示不修改' : 'sk-...'" />
-                  </el-form-item>
-                  <el-form-item label="启用"><el-switch v-model="apiForm.enabled" /></el-form-item>
-                </el-form>
-                <div class="inline-form-actions">
-                  <el-button size="small" @click="showApiForm = false">取消</el-button>
-                  <el-button size="small" type="primary" @click="submitApi">保存</el-button>
-                </div>
-              </div>
-
-              <el-table :data="apiList" size="small" border>
-                <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip />
-                <el-table-column prop="model" label="模型" min-width="110" show-overflow-tooltip />
-                <el-table-column prop="base_url" label="Base URL" min-width="170" show-overflow-tooltip />
-                <el-table-column prop="key_masked" label="Key" width="130" show-overflow-tooltip />
-                <el-table-column label="默认" width="64">
-                  <template #default="{ row }">
-                    <el-tag v-if="row.is_default" type="success" size="small">默认</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="状态" width="72">
-                  <template #default="{ row }">
-                    <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="最近测试" min-width="140" show-overflow-tooltip>
-                  <template #default="{ row }">{{ row.lastTest || '—' }}</template>
-                </el-table-column>
-                <el-table-column label="操作" width="230" fixed="right">
-                  <template #default="{ row }">
-                    <el-button size="small" :loading="testingId === row.id" @click="runTest(row)">测试</el-button>
-                    <el-button size="small" :disabled="row.is_default" @click="makeDefault(row)">默认</el-button>
-                    <el-button size="small" @click="editApi(row)">编辑</el-button>
-                    <el-button size="small" type="danger" :plain="deletingId !== row.id"
-                               @click="removeApi(row)">{{ deletingId === row.id ? '确认删除' : '删除' }}</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </template>
-            <template v-else>
-              <div class="settings-row"><span>接入的模型</span><b>{{ llmStatus?.default_model || '未配置' }}</b></div>
-              <div class="settings-row"><span>服务提供方</span><b>{{ llmStatus?.provider || '—' }}</b></div>
-              <div class="settings-row muted"><el-icon><Lock /></el-icon> 由管理员统一管理</div>
-            </template>
+            </div>
+            <div class="settings-row"><span>当前角色</span><b>{{ roleName }}</b></div>
+            <div class="settings-row"><span>本地会话</span><b>{{ sessions.length }} 个</b></div>
+            <div class="settings-row"><span>模型状态</span><b>{{ llmStatus?.available ? llmStatus.default_model : '示例模式' }}</b></div>
+            <div class="settings-row"><span>版本</span><b>DataPro v0.1</b></div>
+            <div class="settings-row muted">只读查询 · AI 生成结果请人工复核</div>
           </div>
-
-          <div class="settings-row muted" style="margin-top:20px">DataPro v0.1 · 只读查询 · AI 生成结果请人工复核</div>
         </div>
       </el-scrollbar>
     </main>
