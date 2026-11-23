@@ -1,10 +1,13 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CopyDocument, DataLine, Document, Download, InfoFilled, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, User, WarningFilled } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpBold, ChatDotSquare, CircleCheck, CopyDocument, DataLine, Document, Download, InfoFilled, Lock, Menu, Moon, Paperclip, Plus, Refresh, Search, Setting, Sunny, User, WarningFilled } from '@element-plus/icons-vue'
 import { sendFeedback, streamChat } from './api/chat'
 import { deleteApi, fetchApis, fetchLlmStatus, saveApi, setDefaultApi, testApi } from './api/admin'
-import { deleteFile, downloadUrl, listFiles, uploadFile } from './api/files'
+import { deleteFile, downloadUrl, fetchPreview, inlineUrl, listFiles, lockFile, unlockFile, uploadFile } from './api/files'
+
+// Univer 体积较大，仅在打开编辑器时按需加载
+const UniverSheet = defineAsyncComponent(() => import('./editor/UniverSheet.vue'))
 
 // ---- 主题 ----
 const theme = ref(localStorage.getItem('dp_theme') || 'light')
@@ -277,6 +280,7 @@ function handleEvent(ev, msg, t0 = 0) {
     case 'result':
       msg.result = ev
       msg.text = ev.summary
+      msg.queryId = ev.query_id        // B08：反馈回写 query_record
       if (t0) msg.elapsedMs = Math.round(performance.now() - t0)   // F31 结果耗时
       break
     case 'reject':
@@ -300,7 +304,7 @@ const reasonFor = ref(null)   // 需要选原因的 msg 引用
 function clickFeedback(msg, rating) {
   if (rating === 'up') {
     msg.feedback = 'up'
-    sendFeedback('latest', 'up').then(ok => ok && ElMessage.success('感谢反馈，已记录'))
+    sendFeedback(msg.queryId || 'latest', 'up').then(ok => ok && ElMessage.success('感谢反馈，已记录'))
   } else {
     if (msg.feedback === 'down') { msg.feedback = null; reasonFor.value = null; return }
     reasonFor.value = msg      // 展开"选择原因"面板
@@ -311,7 +315,7 @@ async function submitReason(reason) {
   const msg = reasonFor.value
   msg.feedback = 'down'
   reasonFor.value = null
-  const ok = await sendFeedback('latest', 'down', reason)
+  const ok = await sendFeedback(msg.queryId || 'latest', 'down', reason)
   if (ok) ElMessage.success('已记录，会有人跟进核实')
 }
 
@@ -367,6 +371,172 @@ const shownFiles = computed(() => {
     return !q || (f.name || '').toLowerCase().includes(q)
   })
 })
+
+// ---- F34 文件预览（表格 / 图片 / PDF） ----
+const previewFile = ref(null)
+const previewData = ref(null)
+const previewLoading = ref(false)
+const previewSheet = ref(0)
+
+async function openPreview(f) {
+  if (!f?.file_id) return
+  previewFile.value = f
+  previewData.value = null
+  previewSheet.value = 0
+  activeView.value = 'file'
+  previewLoading.value = true
+  try { previewData.value = await fetchPreview(f.file_id) }
+  catch (e) { ElMessage.error(e.message) }
+  finally { previewLoading.value = false }
+}
+function closePreview() {
+  releaseEditLock()
+  previewFile.value = null
+  previewData.value = null
+  activeView.value = 'chat'
+}
+const previewKind = computed(() => {
+  const ext = (previewFile.value?.ext || '').toLowerCase()
+  if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) return 'image'
+  if (ext === '.pdf') return 'pdf'
+  if (previewData.value?.sheets?.length) return 'table'
+  return 'none'
+})
+const activePreviewSheet = computed(
+  () => previewData.value?.sheets?.[previewSheet.value] || null)
+
+// ---- 文件在线编辑（CSV/TSV/XLSX；Univer 开源版 + SheetJS；保存为新版本） ----
+const EDITABLE_EXTS = ['.csv', '.tsv', '.xlsx']
+const EDIT_MAX_ROWS_PER_SHEET = 5000
+const EDIT_MAX_ROWS_TOTAL = 10000
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const editing = ref(false)
+const editorReady = ref(false)
+const editorSheets = ref(null)
+const editorRef = ref()
+const saving = ref(false)
+const canEdit = computed(
+  () => EDITABLE_EXTS.includes((previewFile.value?.ext || '').toLowerCase())
+    && previewKind.value === 'table')
+
+const editorProps = computed(() => (editorSheets.value ? { sheets: editorSheets.value } : {}))
+
+const lockOwner = () => sessionId.value || 'default'
+
+async function startEdit() {
+  const sheets = previewData.value?.sheets || []
+  if (!sheets.length) return
+  const oversized = sheets.find(s => (s.row_count || 0) > EDIT_MAX_ROWS_PER_SHEET)
+  if (oversized) {
+    ElMessage.warning(`工作表「${oversized.sheet || '未命名'}」共 ${oversized.row_count} 行，超过单表 ${EDIT_MAX_ROWS_PER_SHEET} 行上限，请下载后修改再上传`)
+    return
+  }
+  const total = sheets.reduce((n, s) => n + (s.row_count || s.rows.length), 0)
+  if (total > EDIT_MAX_ROWS_TOTAL) {
+    ElMessage.warning(`文件共 ${total} 行，超过 ${EDIT_MAX_ROWS_TOTAL} 行上限，请下载后修改再上传`)
+    return
+  }
+  try {
+    const full = await fetchPreview(previewFile.value.file_id, EDIT_MAX_ROWS_PER_SHEET)
+    await lockFile(previewFile.value.file_id, lockOwner())
+    editorSheets.value = (full.sheets || []).map((s, i) => ({
+      name: s.sheet || `工作表${i + 1}`,
+      labels: s.labels,
+      columns: s.columns,
+      rows: s.rows,
+    }))
+    editorReady.value = false
+    editing.value = true
+  } catch (e) {
+    ElMessage.warning(e.message || '无法打开编辑器')
+  }
+}
+
+function releaseEditLock() {
+  if (!editing.value || !previewFile.value) return
+  unlockFile(previewFile.value.file_id, lockOwner()).catch(() => {})
+  editing.value = false
+  editorSheets.value = null
+}
+
+async function cancelEdit() {
+  releaseEditLock()
+}
+
+function toDelimited(rows, delim) {
+  const cell = (v) => {
+    const s = v == null ? '' : String(v)
+    return /[",\n\r\t]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s
+  }
+  return rows.map(r => r.map(cell).join(delim)).join('\n')
+}
+
+function trimRows(values) {
+  const rows = (values || []).map(r => r.map(v => (v == null ? '' : v)))
+  while (rows.length && rows[rows.length - 1].every(v => v === '')) rows.pop()
+  if (!rows.length) return []
+  const width = Math.max(...rows.map(r => r.length))
+  return rows.map(r => [...r, ...Array(width - r.length).fill('')])
+}
+
+function cleanSheetName(raw, used, index) {
+  const name = String(raw || '').replace(/[\[\]:*?\/\\]/g, '_').trim().slice(0, 31) || `Sheet${index + 1}`
+  let candidate = name
+  let n = 2
+  while (used.has(candidate)) candidate = `${name}(${n++})`.slice(0, 31)
+  used.add(candidate)
+  return candidate
+}
+
+async function buildXlsxFile(sheets, filename) {
+  const XLSX = await import('xlsx')
+  const book = XLSX.utils.book_new()
+  const used = new Set()
+  sheets.forEach((s, i) => {
+    XLSX.utils.book_append_sheet(
+      book, XLSX.utils.aoa_to_sheet(s.values), cleanSheetName(s.name, used, i))
+  })
+  const buf = XLSX.write(book, { bookType: 'xlsx', type: 'array' })
+  return new File([buf], filename, { type: XLSX_MIME })
+}
+
+async function saveEdit() {
+  if (saving.value) return
+  const extracted = editorRef.value?.extract() || []
+  const sheets = extracted
+    .map((s, i) => ({ name: s.name || `工作表${i + 1}`, values: trimRows(s.values) }))
+    .filter(s => s.values.length)
+  if (!sheets.length) {
+    ElMessage.warning('内容为空，未保存')
+    return
+  }
+  const ext = previewFile.value.ext
+  const base = previewFile.value.name.replace(/\.(csv|tsv|xlsx)$/i, '')
+  const stamp = new Date().toISOString().slice(5, 16).replace(/[-:T]/g, '')
+  const name = `${base}_edited_${stamp}${ext}`
+  saving.value = true
+  try {
+    let file
+    if (ext === '.xlsx') {
+      file = await buildXlsxFile(sheets, name)
+    } else {
+      const text = toDelimited(sheets[0].values, ext === '.tsv' ? '\t' : ',')
+      file = new File([ext === '.csv' ? '\ufeff' + text : text], name,
+        { type: ext === '.tsv' ? 'text/tab-separated-values' : 'text/csv' })
+    }
+    const meta = await uploadFile({ sessionId: lockOwner(), file, origin: 'edited' })
+    unlockFile(previewFile.value.file_id, lockOwner()).catch(() => {})
+    editing.value = false
+    editorSheets.value = null
+    await loadFiles()
+    await openPreview(meta)
+    ElMessage.success('已保存为新版本')
+  } catch (e) {
+    ElMessage.error(e.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
 
 function togglePanel(tab) {
   if (tab) panelTab.value = tab
@@ -846,7 +1016,8 @@ async function onPickModel(row) {
             <div v-if="msg.role === 'user'" class="content">
               {{ msg.text }}
               <div v-if="msg.attachments?.length" class="msg-atts">
-                <span v-for="a in msg.attachments" :key="a.file_id" class="msg-att">
+                <span v-for="a in msg.attachments" :key="a.file_id" class="msg-att"
+                      :class="{ clickable: a.file_id }" @click="openPreview(a)">
                   {{ fileIcon(a) }} {{ a.name }}
                 </span>
               </div>
@@ -1028,6 +1199,78 @@ async function onPickModel(row) {
         <div v-if="dragOver" class="drop-mask">松开即可上传文件</div>
       </div>
 
+      <!-- 文件预览视图（F34：无弹窗，主区呈现） -->
+      <el-scrollbar v-else-if="activeView === 'file' && previewFile" class="thread-scroll">
+        <div class="page-view preview-view">
+          <div class="preview-head">
+            <button class="icon-btn" title="返回对话" @click="closePreview">
+              <el-icon><ArrowLeft /></el-icon>
+            </button>
+            <span class="preview-ico">{{ fileIcon(previewFile) }}</span>
+            <div class="preview-meta">
+              <div class="preview-name">{{ previewFile.name }}</div>
+              <div class="preview-sub">
+                <span>{{ fmtSize(previewFile.size || 0) }}</span>
+                <span v-if="previewData?.sheets?.length">{{ previewData.sheets.length }} 个工作表</span>
+                <span v-if="previewLoading">加载中…</span>
+              </div>
+            </div>
+            <template v-if="editing">
+              <button class="preview-save" :disabled="saving" @click="saveEdit">
+                {{ saving ? '保存中…' : '保存为新版本' }}
+              </button>
+              <button class="preview-cancel" :disabled="saving" @click="cancelEdit">取消</button>
+            </template>
+            <button v-else-if="canEdit" class="preview-edit" @click="startEdit">编辑</button>
+            <a class="preview-dl" :href="downloadUrl(previewFile.file_id)" :download="previewFile.name">
+              <el-icon><Download /></el-icon> 下载
+            </a>
+          </div>
+
+          <div v-if="editing" class="editor-wrap">
+            <div v-if="!editorReady" class="editor-loading">编辑器加载中…</div>
+            <UniverSheet ref="editorRef" v-bind="editorProps" @ready="editorReady = true" />
+          </div>
+
+          <div v-else-if="previewKind === 'table' && activePreviewSheet" class="preview-body">
+            <div v-if="previewData.sheets.length > 1" class="sheet-tabs">
+              <button v-for="(s, idx) in previewData.sheets" :key="s.table" class="sheet-tab"
+                      :class="{ active: previewSheet === idx }" @click="previewSheet = idx">
+                {{ s.sheet || `工作表${idx + 1}` }}
+              </button>
+            </div>
+            <div class="result-table preview-table">
+              <table>
+                <thead>
+                  <tr><th v-for="c in activePreviewSheet.labels" :key="c">{{ c }}</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, r) in activePreviewSheet.rows" :key="r">
+                    <td v-for="c in activePreviewSheet.columns" :key="c" :title="String(row[c])">
+                      {{ row[c] }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="preview-note">
+              预览前 {{ activePreviewSheet.rows.length }} 行，共 {{ activePreviewSheet.row_count }} 行
+            </div>
+          </div>
+
+          <div v-else-if="previewKind === 'image'" class="preview-media">
+            <img :src="inlineUrl(previewFile.file_id)" :alt="previewFile.name" />
+          </div>
+          <iframe v-else-if="previewKind === 'pdf'" class="preview-pdf"
+                  :src="inlineUrl(previewFile.file_id)" title="PDF 预览" />
+
+          <div v-else class="preview-empty">
+            <div class="panel-empty-graphic">▤</div>
+            <div>该格式暂不支持在线预览，请下载查看</div>
+          </div>
+        </div>
+      </el-scrollbar>
+
       <!-- 设置视图（F21：无弹窗，Codex 式页面视图） -->
       <el-scrollbar v-else-if="activeView === 'settings'" class="thread-scroll">
         <div class="page-view">
@@ -1158,9 +1401,9 @@ async function onPickModel(row) {
              :title="`${f.name} · ${f.created_at.slice(0, 16).replace('T', ' ')}`">
           <span class="file-ico">{{ fileIcon(f) }}</span>
           <div class="file-info">
-            <div class="file-name">{{ f.name }}</div>
+            <div class="file-name clickable" title="点击预览" @click="openPreview(f)">{{ f.name }}</div>
             <div class="file-sub">
-              <span class="file-tag" :class="f.origin">{{ f.origin === 'generated' ? '生成' : '上传' }}</span>
+              <span class="file-tag" :class="f.origin">{{ f.origin === 'generated' ? '生成' : f.origin === 'edited' ? '编辑' : '上传' }}</span>
               <span class="file-stat">{{ fmtSize(f.size) }}</span>
               <span v-if="f.parsed" class="file-parsed">{{ f.parsed.row_count }}×{{ f.parsed.col_count }}</span>
               <span v-if="f.parsed?.tables?.length > 1" class="file-parsed">{{ f.parsed.tables.length }}表</span>

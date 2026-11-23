@@ -48,6 +48,7 @@ class PipelineContext:
     question: str
     user_id: str
     session_id: str = ""
+    trace_id: str = ""
     history: list[dict] = field(default_factory=list)
     clarify_count: int = 0
     generate_retries: int = 0

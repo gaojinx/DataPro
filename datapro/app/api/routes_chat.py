@@ -1,6 +1,7 @@
 """对话主接口：SSE 流式返回（接口规范 §4.1）。"""
 import asyncio
 import json
+import time
 import uuid
 
 from fastapi import APIRouter, HTTPException
@@ -11,6 +12,7 @@ from app.config import settings
 from app.core.errors import E003
 from app.core.statemachine import Pipeline, PipelineContext
 from app.core.trace import new_trace_id
+from app.services import persist
 from app.services.audit import audit_service
 from app.services.intent import answer_service, intent_service
 from app.services.generator import generator_service
@@ -51,16 +53,31 @@ async def chat(req: ChatRequest, user_id: str = "dev_user"):
     trace_id = new_trace_id()
 
     pipeline = build_pipeline()
-    ctx = PipelineContext(question=req.message, user_id=user_id,
+    ctx = PipelineContext(question=req.message, user_id=user_id, trace_id=trace_id,
                           history=history, session_id=session_id)
 
     async def stream():
         yield sse({"type": "node", "node": "START", "session_id": session_id, "trace_id": trace_id})
+        started = time.perf_counter()
+        saved = False
+        answer = ""
         try:
             async for event in pipeline.run(ctx):
                 await audit_service.record(event.get("node", event.get("type")), ctx, event)
+                etype = event.get("type")
+                if etype == "result":                 # B08：结果落库并回传 query_id
+                    answer = event.get("summary") or ""
+                    query_id = await persist.save_query(
+                        ctx, answer, int((time.perf_counter() - started) * 1000))
+                    if query_id:
+                        event["query_id"] = query_id
+                    saved = True
+                elif etype in ("clarify", "reject", "escalate", "error"):
+                    answer = event.get("question") or event.get("message") or answer
                 yield sse(event)
         finally:
+            if not saved:                              # 澄清/拒答/异常也留痕
+                await persist.save_query(ctx, answer, int((time.perf_counter() - started) * 1000))
             history.append({"role": "assistant",
                             "content": json.dumps(ctx.result or {}, ensure_ascii=False, default=str)})
 
@@ -80,5 +97,8 @@ async def delete_session(session_id: str):
 
 @router.post("/queries/{query_id}/feedback")
 async def feedback(query_id: str, rating: str, reason: str | None = None):
-    # 写 query_record.user_feedback；👍 自动进历史问答候选池（口径库模板 §3）
-    return {"query_id": query_id, "rating": rating, "reason": reason}
+    # B08：写 query_record.user_feedback；👍 后续可进历史问答候选池（口径库模板 §3）
+    if rating not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="rating 仅支持 up/down")
+    recorded = await persist.set_feedback(query_id, rating, reason)
+    return {"query_id": query_id, "rating": rating, "reason": reason, "recorded": recorded}

@@ -24,3 +24,19 @@ export async function deleteFile(fileId) {
 }
 
 export const downloadUrl = (fileId) => `${BASE}/${fileId}/download`
+export const inlineUrl = (fileId) => `${BASE}/${fileId}/download?inline=1`
+
+export async function fetchPreview(fileId, limit = 200) {
+  return parse(await fetch(`${BASE}/${fileId}/preview?limit=${limit}`))
+}
+
+async function lockCall(fileId, owner, action) {
+  return parse(await fetch(`${BASE}/${fileId}/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner: owner || 'default' }),
+  }))
+}
+
+export const lockFile = (fileId, owner) => lockCall(fileId, owner, 'lock')
+export const unlockFile = (fileId, owner) => lockCall(fileId, owner, 'unlock')

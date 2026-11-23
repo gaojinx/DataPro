@@ -41,6 +41,7 @@ class QueryRecord(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     final_answer: Mapped[str | None] = mapped_column(Text)
     user_feedback: Mapped[str | None] = mapped_column(String(8))  # up / down
+    feedback_reason: Mapped[str | None] = mapped_column(String(64))
     trace_id: Mapped[str] = mapped_column(String(32), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

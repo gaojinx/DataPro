@@ -3,6 +3,7 @@ import json
 import logging
 
 from app.core.trace import current_trace_id
+from app.services import persist
 
 logger = logging.getLogger("datapro.audit")
 
@@ -17,9 +18,9 @@ class AuditService:
             "sql_text": getattr(ctx, "generated_sql", None),
             "payload": json.dumps(payload or {}, ensure_ascii=False, default=str)[:2000],
         }
-        # 骨架阶段写日志；接入 app_database_url 后异步落 audit_log 表（保留 ≥180 天）
+        # 审计落库（S03）：后台任务写 audit_log，失败仅记日志不重试
         logger.info("AUDIT %s", json.dumps(entry, ensure_ascii=False))
-        # TODO(G2): asyncio.create_task 写 MySQL audit_log，失败仅记日志不重试
+        persist.spawn(persist.save_audit(entry))
 
 
 audit_service = AuditService()

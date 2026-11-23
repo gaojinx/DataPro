@@ -42,9 +42,18 @@ class ExecutorService:
             )
         return self._engine
 
+    def _has_files(self, session_id: str) -> bool:
+        """会话是否已有解析文件表（决定是否需要会话级账号）。"""
+        from app.services.file_store import file_store
+        try:
+            return bool(file_store.parsed_files(session_id))
+        except Exception:  # noqa: BLE001 —— 读取失败时按无文件处理
+            return False
+
     def _engine_for(self, session_id: str) -> sa.Engine:
-        """会话级账号：仅能读公共数仓 + 本会话文件表（安全修复）。"""
-        if not session_id:
+        """有文件会话用会话级账号（仅能读公共数仓 + 本会话文件表）；
+        无文件会话沿用共享只读账号（共享账号已无 dp_uploads 权限，安全等价）。"""
+        if not session_id or not self._has_files(session_id):
             return self._get_engine()
         with self._engine_lock:
             eng = self._session_engines.get(session_id)

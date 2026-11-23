@@ -79,7 +79,7 @@ class FileStore:
             "size": len(content),
             "ext": ext,
             "mime": MIME_BY_EXT.get(ext, "application/octet-stream"),
-            "origin": origin if origin in ("upload", "generated") else "upload",
+            "origin": origin if origin in ("upload", "generated", "edited") else "upload",
             "query_id": query_id,
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "stored_name": stored.name,
