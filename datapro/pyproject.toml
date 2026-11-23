@@ -1,0 +1,26 @@
+[project]
+name = "datapro"
+version = "0.1.0"
+description = "DataPro - 企业数据管家 Agent（Chat2SQL / 元数据问答 / 数据巡检）"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic-settings>=2.0",
+    "sqlglot>=25.0",
+    "sqlalchemy>=2.0",
+    "pymysql>=1.1",
+    "redis>=5.0",
+    "openai>=1.40",
+    "apscheduler>=3.10",
+    "cryptography>=42.0",  # pymysql caching_sha2_password 需要
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "httpx>=0.27", "locust>=2.29"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Windows 系统 Temp 可能无写权限，临时目录固定到项目内
+addopts = "--basetemp=.pytest_tmp"

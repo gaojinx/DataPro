@@ -1,0 +1,32 @@
+# MVP 部署拓扑（HLD §8）：MVP 只起 mysql + redis，api/worker 本地跑；
+# 扩量时启用 milvus 全家桶（需 etcd+minio，见 milvus 官方 compose）
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_only
+      MYSQL_DATABASE: datapro
+      MYSQL_USER: datapro
+      MYSQL_PASSWORD: datapro_dev
+    ports: ["3306:3306"]
+    volumes: ["datapro_mysql:/var/lib/mysql"]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  # api:
+  #   build: .
+  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8100
+  #   env_file: .env
+  #   ports: ["8100:8100"]
+  #   depends_on: [mysql, redis]
+
+  # worker:
+  #   build: .
+  #   command: python -m worker.inspection_worker
+  #   env_file: .env
+  #   depends_on: [mysql, redis]
+
+volumes:
+  datapro_mysql:

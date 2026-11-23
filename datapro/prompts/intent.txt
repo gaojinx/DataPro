@@ -1,0 +1,8 @@
+# version: v0
+# changelog: 2026-11-20 初版骨架
+## 任务
+判断用户输入属于以下哪一类，输出 JSON：
+- {"intent": "query"}      数据取数需求
+- {"intent": "meta_qa"}    元数据/口径/字段问答
+- {"intent": "forbidden"}  写操作、修改数据、越权等越界请求
+- {"intent": "chitchat"}   与数据无关的闲聊

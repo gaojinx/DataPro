@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.pytest_tmp/
+
+# Node / 构建产物
+node_modules/
+dist/
+.tmp/
+
+# 运行时数据与密钥（含上传文件、API Key 注册表）
+datapro/data/
+.env
+*.log
+
+# 独立演示项目（如需纳入仓库请删除此行）
+univer-demo/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+.screenshots/

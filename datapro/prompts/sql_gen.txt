@@ -1,0 +1,21 @@
+# version: v0
+# changelog: 2026-11-20 初版骨架（详见 docs/DataPro-Prompt设计.md §3.1）
+## 任务
+根据用户问题生成一条只读 SELECT 查询。
+
+## 输入
+- 用户问题：{question}（含澄清轮次拼接的完整上下文）
+- 可用表结构：{recalled_schemas}   # 只注入召回命中的表
+- 相关指标口径：{calibers}         # 口径 logic 优先于你的理解
+- 历史修正错误（如有）：{retry_errors}
+
+## 要求
+1. 优先使用口径库中的 logic，不要重新解释指标。
+2. 必须带时间条件（用户未说则默认最近 7 天，并在 assumptions 中说明）。
+3. 必须带 LIMIT，默认 200。
+4. 时间条件禁止硬编码当前日期，使用占位符 {date}，由执行引擎注入。
+5. 禁止：任何写操作、查询检索结果之外的表、无 LIMIT 的全表扫描。
+
+## 输出 JSON
+{"sql": "SELECT ...", "explanation": "一句话解释查询逻辑", "assumptions": ["假设1"], "confidence": "high"}
+confidence=low 时不要输出 sql，输出 NEED_INFO。

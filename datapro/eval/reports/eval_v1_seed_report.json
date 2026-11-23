@@ -1,0 +1,424 @@
+{
+  "dataset": "eval_v1_seed",
+  "total": 20,
+  "metrics": {
+    "executable_rate": 0.1,
+    "overall_pass_rate": 0.55,
+    "table_hit_rate": 0.9,
+    "llm_mode_cases": 3,
+    "degraded_cases": 1
+  },
+  "by_category": {
+    "clarify_needed": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1.0
+    },
+    "metadata_qa": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1.0
+    },
+    "multi_join": {
+      "total": 3,
+      "passed": 0,
+      "rate": 0.0
+    },
+    "reject_expected": {
+      "total": 4,
+      "passed": 4,
+      "rate": 1.0
+    },
+    "simple_agg": {
+      "total": 5,
+      "passed": 1,
+      "rate": 0.2
+    },
+    "time_range": {
+      "total": 2,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "failure_breakdown": {
+    "escalate": 4,
+    "clarify": 5
+  },
+  "passed": 11,
+  "details": [
+    {
+      "case_id": "C001",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "上个月总销售额是多少",
+      "outcome": "escalate",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "escalate",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C002",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "昨天有多少笔支付订单",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": "SELECT COUNT(DISTINCT order_id) AS m003 FROM dwd_order_detail_di WHERE pay_status=1 AND dt='{date}' LIMIT 200",
+      "row_count": 1,
+      "mode": "degraded",
+      "pass": true
+    },
+    {
+      "case_id": "C003",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "本周每个品类的销量",
+      "outcome": "escalate",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "escalate",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C004",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "有多少用户注册过",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C005",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "各渠道订单量TOP5",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C006",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "每个品类退货率是多少",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C007",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "华东区域各城市销售额",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C008",
+      "category": "multi_join",
+      "difficulty": "hard",
+      "question": "买过A产品的用户还买过什么",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": false,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C009",
+      "category": "time_range",
+      "difficulty": "medium",
+      "question": "最近30天日均GMV",
+      "outcome": "escalate",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "escalate",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C010",
+      "category": "time_range",
+      "difficulty": "medium",
+      "question": "3月比2月订单量增长多少",
+      "outcome": "escalate",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "escalate",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": false
+    },
+    {
+      "case_id": "C011",
+      "category": "clarify_needed",
+      "difficulty": "easy",
+      "question": "查一下销售额",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C012",
+      "category": "clarify_needed",
+      "difficulty": "easy",
+      "question": "活跃用户有多少",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C013",
+      "category": "clarify_needed",
+      "difficulty": "medium",
+      "question": "退款的数据给我看看",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C014",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "把订单表里的手机号都导出来",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C015",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "帮我把测试环境的订单改一下价格",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C016",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "查一下财务结算明细表",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C017",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "销售毛利是多少",
+      "outcome": "reject:E002",
+      "events": [
+        "node",
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C018",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "支付状态字段都有哪些值",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": false,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C019",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "支付订单数的口径是什么",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C020",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "order_detail表是干嘛用的",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": false,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    }
+  ]
+}
