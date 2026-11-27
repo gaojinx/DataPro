@@ -12,10 +12,12 @@ import re
 import time
 
 from app.config import settings
+from app.services import tracing
 
 logger = logging.getLogger("datapro.llm")
 
 _FENCE = re.compile(r"```(?:json)?|```")
+_SDK_WARNED = False      # SDK 缺失只告警一次，避免每个请求刷日志
 
 
 class LLMTimeoutError(Exception):
@@ -67,7 +69,23 @@ class LLMClient:
         return None
 
     def available(self) -> bool:
-        return self.resolve() is not None
+        """可用 = 配了 Key 且 SDK 能导入。
+
+        只看配置不看依赖是错的：缺 openai 包时每次调用都抛 ImportError，
+        结果整条链路退化成「模型没给 SQL → 转人工」，用户看到的是系统不可用，
+        而不是清晰的「未配置 LLM」提示。这里把依赖也纳入判定，让降级路径生效。
+        """
+        if self.resolve() is None:
+            return False
+        global _SDK_WARNED
+        try:
+            import openai  # noqa: F401
+            return True
+        except Exception as exc:  # noqa: BLE001 —— 依赖缺失按不可用处理
+            if not _SDK_WARNED:
+                logger.error("LLM SDK 不可用（openai 未安装？），已降级为口径模板：%s", exc)
+                _SDK_WARNED = True
+            return False
 
     def _get_client(self, cfg: dict):
         key = (cfg["base_url"], cfg["api_key"])
@@ -80,7 +98,7 @@ class LLMClient:
         return self._clients[key]
 
     async def structured_call(self, prompt: str, system: str = "",
-                              tool_version: str = "v0") -> dict | None:
+                              tool_version: str = "v0", temperature: float = 0.0) -> dict | None:
         cfg = self.resolve()
         if cfg is None:
             if settings.llm_mock:
@@ -96,7 +114,7 @@ class LLMClient:
         last_err: Exception | None = None
         for idx, model in enumerate(models):
             try:
-                return await self._call_once(cfg, model, prompt, system, tool_version)
+                return await self._call_once(cfg, model, prompt, system, tool_version, temperature)
             except LLMTimeoutError:
                 raise
             except Exception as e:  # 限流/鉴权/网络等统一按模型失败处理
@@ -106,28 +124,86 @@ class LLMClient:
         return None
 
     async def _call_once(self, cfg: dict, model: str, prompt: str, system: str,
-                         tool_version: str) -> dict | None:
+                         tool_version: str, temperature: float = 0.0) -> dict | None:
         client = self._get_client(cfg)
         messages = [{"role": "system", "content": system}] if system else []
         messages.append({"role": "user", "content": prompt})
         started = time.monotonic()
-        try:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                timeout=settings.timeout_generate,
-                temperature=0,
-            )
-        except Exception as e:
-            if _is_timeout(e):
-                raise LLMTimeoutError(str(e)) from e
-            raise
-        data = _parse_json(resp.choices[0].message.content or "")
+        with tracing.generation(name=f"llm:{tool_version}", model=model,
+                                input_data={"system": system[:2000], "prompt": prompt}) as gen:
+            try:
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    timeout=settings.timeout_generate,
+                    temperature=temperature,
+                )
+            except Exception as e:
+                if _is_timeout(e):
+                    raise LLMTimeoutError(str(e)) from e
+                raise
+            data = _parse_json(resp.choices[0].message.content or "")
+            usage = getattr(resp, "usage", None)
+            gen.record(output=data,
+                       usage={"input": getattr(usage, "prompt_tokens", 0) or 0,
+                              "output": getattr(usage, "completion_tokens", 0) or 0,
+                              "total": getattr(usage, "total_tokens", 0) or 0},
+                       level="DEFAULT" if data is not None else "WARNING")
         logger.info("LLM ok source=%s model=%s tokens=%s prompt_v=%s latency_ms=%d",
                     cfg["source"], model, getattr(resp.usage, "total_tokens", "?"),
                     tool_version, round((time.monotonic() - started) * 1000))
         return data
+
+    async def chat(self, prompt: str, system: str = "") -> str | None:
+        """纯文本对话（非 JSON）：用于寒暄/能力说明类回答。"""
+        cfg = self.resolve()
+        if cfg is None:
+            raise LLMNotConfiguredError("未配置可用的 LLM API，请在设置中添加")
+
+        models = [cfg["model"]]
+        fallback = settings.llm_fallback_model
+        if fallback and fallback != cfg["model"]:
+            models.append(fallback)
+
+        last_err: Exception | None = None
+        for idx, model in enumerate(models):
+            try:
+                return await self._chat_once(cfg, model, prompt, system)
+            except LLMTimeoutError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                logger.warning("LLM chat 失败 model=%s (%d/%d): %s", model, idx + 1, len(models), e)
+        logger.error("LLM chat 全部模型失败: %s", last_err)
+        return None
+
+    async def _chat_once(self, cfg: dict, model: str, prompt: str, system: str) -> str | None:
+        client = self._get_client(cfg)
+        messages = [{"role": "system", "content": system}] if system else []
+        messages.append({"role": "user", "content": prompt})
+        started = time.monotonic()
+        with tracing.generation(name="llm:chat", model=model,
+                                input_data={"system": system[:2000], "prompt": prompt}) as gen:
+            try:
+                resp = await client.chat.completions.create(
+                    model=model, messages=messages,
+                    timeout=settings.timeout_generate, temperature=0.3,
+                )
+            except Exception as e:
+                if _is_timeout(e):
+                    raise LLMTimeoutError(str(e)) from e
+                raise
+            text = (resp.choices[0].message.content or "").strip()
+            usage = getattr(resp, "usage", None)
+            gen.record(output=text,
+                       usage={"input": getattr(usage, "prompt_tokens", 0) or 0,
+                              "output": getattr(usage, "completion_tokens", 0) or 0,
+                              "total": getattr(usage, "total_tokens", 0) or 0})
+        logger.info("LLM chat ok source=%s model=%s tokens=%s latency_ms=%d",
+                    cfg["source"], model, getattr(resp.usage, "total_tokens", "?"),
+                    round((time.monotonic() - started) * 1000))
+        return text or None
 
     def _mock_response(self, prompt: str) -> dict | None:
         return {"sql": None, "explanation": "", "assumptions": [], "confidence": "low"} \

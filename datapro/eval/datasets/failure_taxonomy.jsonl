@@ -1,0 +1,2 @@
+{"query_id": 112, "question": "支付订单数的口径是什么", "sql": null, "reason": "结果不完整", "taxonomy": "completeness", "trace_id": "c4134040c8d74669"}
+{"query_id": 13, "question": "把订单价格都改一下", "sql": null, "reason": "口径不对", "taxonomy": "caliber", "trace_id": "9c4076da6ef04770"}

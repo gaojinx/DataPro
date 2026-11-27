@@ -1,0 +1,56 @@
+groups:
+  - name: datapro-chat
+    rules:
+      # 5 分钟内错误率超过 20%（错误码 E005/E006/E010 等）
+      - alert: DataProHighErrorRate
+        expr: |
+          sum(rate(datapro_errors_total[5m]))
+            / clamp_min(sum(rate(datapro_chat_requests_total[5m])), 1e-9) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DataPro 对话错误率过高"
+          description: "近 5 分钟错误占比 > 20%，检查 LLM 连通性与数仓状态"
+
+      # 持续限流说明容量或异常调用
+      - alert: DataProRateLimited
+        expr: sum(rate(datapro_rate_limited_total[10m])) > 0.2
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "DataPro 频繁触发限流"
+          description: "单用户每分钟 30 次上限被持续触发，评估调参或排查异常调用"
+
+      # 15 分钟无任何对话：服务可能宕机或无人使用（区分 env 标签）
+      - alert: DataProNoTraffic
+        expr: sum(rate(datapro_chat_requests_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "DataPro 15 分钟无请求"
+          description: "确认 /health 与进程状态；如为业务低谷可忽略"
+
+      # 巡检（A08）：最近 26 小时出现失败规则（每日 06:00 跑一次，留 2 小时余量）
+      - alert: DataProInspectionFailures
+        expr: increase(datapro_inspection_failure_total[26h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DataPro 数据巡检发现异常"
+          description: "检查空值率/行数骤降/断流规则，详见管理后台巡检页"
+
+      # 拒答/转人工占比过高，通常是召回或元数据问题
+      - alert: DataProEscalationSpike
+        expr: |
+          sum(rate(datapro_chat_outcomes_total{type=~"reject|escalate"}[30m]))
+            / clamp_min(sum(rate(datapro_chat_outcomes_total[30m])), 1e-9) > 0.3
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DataPro 拒答/转人工占比过高"
+          description: "检查召回命中率（eval.recall_eval）与元数据是否缺失"

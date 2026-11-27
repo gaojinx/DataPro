@@ -1,71 +1,102 @@
 {
   "dataset": "eval_v1_seed",
-  "total": 20,
+  "total": 50,
   "metrics": {
-    "executable_rate": 0.1,
-    "overall_pass_rate": 0.55,
-    "table_hit_rate": 0.9,
-    "llm_mode_cases": 3,
-    "degraded_cases": 1
+    "executable_rate": 1.0,
+    "overall_pass_rate": 1.0,
+    "table_hit_rate": 1.0,
+    "time_window_pass_rate": 1.0,
+    "result_match_rate": 1.0,
+    "false_answer_rate": 0.0,
+    "must_not_pass_rate": 1.0,
+    "table_overflow_rate": 0.0,
+    "llm_mode_cases": 42,
+    "degraded_cases": 0
   },
   "by_category": {
     "clarify_needed": {
-      "total": 3,
-      "passed": 3,
+      "total": 6,
+      "passed": 6,
       "rate": 1.0
     },
     "metadata_qa": {
-      "total": 3,
-      "passed": 3,
+      "total": 7,
+      "passed": 7,
       "rate": 1.0
     },
     "multi_join": {
-      "total": 3,
-      "passed": 0,
-      "rate": 0.0
+      "total": 10,
+      "passed": 10,
+      "rate": 1.0
+    },
+    "out_of_scope": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1.0
     },
     "reject_expected": {
-      "total": 4,
-      "passed": 4,
+      "total": 6,
+      "passed": 6,
       "rate": 1.0
     },
     "simple_agg": {
-      "total": 5,
-      "passed": 1,
-      "rate": 0.2
+      "total": 17,
+      "passed": 17,
+      "rate": 1.0
     },
     "time_range": {
       "total": 2,
-      "passed": 0,
-      "rate": 0.0
+      "passed": 2,
+      "rate": 1.0
     }
   },
-  "failure_breakdown": {
-    "escalate": 4,
-    "clarify": 5
-  },
-  "passed": 11,
+  "failure_breakdown": {},
+  "table_overflow": [],
+  "passed": 50,
   "details": [
     {
       "case_id": "C001",
       "category": "simple_agg",
       "difficulty": "easy",
       "question": "上个月总销售额是多少",
-      "outcome": "escalate",
+      "outcome": "result",
       "events": [
         "node",
         "node",
         "node",
         "node",
         "node",
-        "escalate",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-10-01",
+        "end": "2026-10-31"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "总销售额",
+        "time_phrase": "上个月",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C002",
@@ -80,13 +111,35 @@
         "node",
         "node",
         "node",
+        "node",
+        "node",
+        "node",
         "result",
         "node"
       ],
       "table_hit": true,
-      "sql": "SELECT COUNT(DISTINCT order_id) AS m003 FROM dwd_order_detail_di WHERE pay_status=1 AND dt='{date}' LIMIT 200",
+      "time_window": {
+        "start": "2026-11-23",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": 0,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单",
+        "time_phrase": "昨天",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
       "row_count": 1,
-      "mode": "degraded",
+      "mode": "llm",
       "pass": true
     },
     {
@@ -94,170 +147,419 @@
       "category": "simple_agg",
       "difficulty": "easy",
       "question": "本周每个品类的销量",
-      "outcome": "escalate",
+      "outcome": "result",
       "events": [
         "node",
         "node",
         "node",
         "node",
         "node",
-        "escalate",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-11-23",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销量",
+        "time_phrase": "本周",
+        "grain": "品类",
+        "dimensions": [
+          "品类"
+        ],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT category, SUM(qty) AS sales_qty FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND category IS NOT NULL GROUP BY category ORDER BY sales_qty DESC LIMIT 200",
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C004",
       "category": "simple_agg",
       "difficulty": "easy",
       "question": "有多少用户注册过",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": 300,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "注册用户数",
+        "time_phrase": "",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT user_id) AS register_user_cnt FROM dwd_shop.dwd_user_di WHERE register_date IS NOT NULL AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C005",
       "category": "simple_agg",
       "difficulty": "easy",
       "question": "各渠道订单量TOP5",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "订单量",
+        "time_phrase": "",
+        "grain": "渠道",
+        "dimensions": [
+          "渠道"
+        ],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT channel, COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND channel IS NOT NULL GROUP BY channel ORDER BY pay_order_cnt DESC LIMIT 5",
+      "row_count": 4,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C006",
       "category": "multi_join",
       "difficulty": "medium",
       "question": "每个品类退货率是多少",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "退货率",
+        "time_phrase": "",
+        "grain": "品类",
+        "dimensions": [
+          "品类"
+        ],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT category, ROUND(SUM(refund_cnt) / NULLIF(SUM(order_cnt), 0) * 100, 2) AS refund_rate FROM dwd_shop.dws_category_daily WHERE dt BETWEEN '{date_start}' AND '{date_end}' AND category IS NOT NULL GROUP BY category ORDER BY refund_rate DESC LIMIT 200",
+      "row_count": 5,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C007",
       "category": "multi_join",
       "difficulty": "medium",
       "question": "华东区域各城市销售额",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "",
+        "grain": "城市",
+        "dimensions": [
+          "城市"
+        ],
+        "filters": {
+          "区域": "华东"
+        },
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT city, SUM(amount) AS sales_amount FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND region = '华东' AND dt BETWEEN '{date_start}' AND '{date_end}' AND city IS NOT NULL GROUP BY city ORDER BY sales_amount DESC LIMIT 200",
+      "row_count": 18,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C008",
       "category": "multi_join",
       "difficulty": "hard",
       "question": "买过A产品的用户还买过什么",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
-      "table_hit": false,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "还买过什么",
+        "time_phrase": "",
+        "grain": "商品",
+        "dimensions": [
+          "商品"
+        ],
+        "filters": {
+          "产品": "A"
+        },
+        "ambiguous": [
+          "metric",
+          "grain"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT d.goods_name, COUNT(DISTINCT d.user_id) AS buyer_cnt FROM dwd_shop.dwd_order_detail_di d WHERE d.pay_status = 1 AND d.dt BETWEEN '{date_start}' AND '{date_end}' AND d.goods_name <> 'A' AND d.goods_name IS NOT NULL AND d.user_id IN (SELECT o.user_id FROM dwd_shop.dwd_order_detail_di o WHERE o.pay_status = 1 AND o.dt BETWEEN '{date_start}' AND '{date_end}' AND o.goods_name = 'A') GROUP BY d.goods_name ORDER BY buyer_cnt DESC LIMIT 200",
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C009",
       "category": "time_range",
       "difficulty": "medium",
       "question": "最近30天日均GMV",
-      "outcome": "escalate",
+      "outcome": "result",
       "events": [
         "node",
         "node",
         "node",
         "node",
         "node",
-        "escalate",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
+      "time_window": {
+        "start": "2026-10-25",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": "10515.15",
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "GMV",
+        "time_phrase": "最近30天",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(AVG(day_gmv), 2) AS avg_gmv FROM (SELECT dt, SUM(amount) AS day_gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' GROUP BY dt) t LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
     },
     {
       "case_id": "C010",
-      "category": "time_range",
+      "category": "clarify_needed",
       "difficulty": "medium",
       "question": "3月比2月订单量增长多少",
-      "outcome": "escalate",
-      "events": [
-        "node",
-        "node",
-        "node",
-        "node",
-        "node",
-        "escalate",
-        "node"
-      ],
-      "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
-      "pass": false
-    },
-    {
-      "case_id": "C011",
-      "category": "clarify_needed",
-      "difficulty": "easy",
-      "question": "查一下销售额",
       "outcome": "clarify",
       "events": [
+        "node",
+        "node",
+        "node",
         "node",
         "node",
         "clarify",
         "node"
       ],
       "table_hit": true,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "订单量",
+        "time_phrase": "3月比2月",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
       "sql": null,
       "row_count": null,
       "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C011",
+      "category": "clarify_needed",
+      "difficulty": "easy",
+      "question": "查一下销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": "61728.90",
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
       "pass": true
     },
     {
@@ -265,17 +567,46 @@
       "category": "clarify_needed",
       "difficulty": "easy",
       "question": "活跃用户有多少",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": 300,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "活跃用户数",
+        "time_phrase": "",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time",
+          "活跃用户定义"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT user_id) AS active_user_cnt FROM dwd_shop.dwd_user_di WHERE is_active = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
       "pass": true
     },
     {
@@ -283,17 +614,46 @@
       "category": "clarify_needed",
       "difficulty": "medium",
       "question": "退款的数据给我看看",
-      "outcome": "clarify",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "clarify",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
         "node"
       ],
       "table_hit": true,
-      "sql": null,
-      "row_count": null,
-      "mode": null,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "退款",
+        "time_phrase": "",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "metric",
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT refund_id) AS refund_cnt, SUM(amount) AS refund_amt FROM dwd_shop.dwd_refund_detail_di WHERE dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
       "pass": true
     },
     {
@@ -308,6 +668,14 @@
         "node"
       ],
       "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": null,
       "mode": null,
@@ -325,6 +693,14 @@
         "node"
       ],
       "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": null,
       "mode": null,
@@ -343,6 +719,14 @@
         "node"
       ],
       "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": null,
       "mode": null,
@@ -350,20 +734,28 @@
     },
     {
       "case_id": "C017",
-      "category": "reject_expected",
+      "category": "out_of_scope",
       "difficulty": "easy",
       "question": "销售毛利是多少",
-      "outcome": "reject:E002",
+      "outcome": "result",
       "events": [
         "node",
         "node",
-        "reject",
+        "result",
         "node"
       ],
       "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
-      "row_count": null,
-      "mode": null,
+      "row_count": 0,
+      "mode": "llm",
       "pass": true
     },
     {
@@ -379,6 +771,14 @@
         "node"
       ],
       "table_hit": false,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": 0,
       "mode": "llm",
@@ -397,6 +797,14 @@
         "node"
       ],
       "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": 0,
       "mode": "llm",
@@ -415,8 +823,1216 @@
         "node"
       ],
       "table_hit": false,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
       "sql": null,
       "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C021",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-16到2026-11-22的支付订单数是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": 301,
+      "result_pass": true,
+      "must_not_pass": true,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C022",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-20当天的支付订单数",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": 43,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C023",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026年10月的支付订单数是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-10-01",
+        "end": "2026-10-31"
+      },
+      "time_window_pass": true,
+      "scalar": 0,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": true,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026年10月",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C024",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "按品类拆分一下",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-13",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "",
+        "time_phrase": "",
+        "grain": "品类",
+        "dimensions": [
+          "品类"
+        ],
+        "filters": {},
+        "ambiguous": [
+          "metric",
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT category, COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND category IS NOT NULL GROUP BY category ORDER BY pay_order_cnt DESC LIMIT 200",
+      "row_count": 5,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C025",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "那11月16日到11月22日呢",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": 301,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "11月16日到11月22日",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C026",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-20的销售额是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": "10437.65",
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C027",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22的退款金额是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": "3392.70",
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "退款金额",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS refund_amount FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 2 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C028",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-20有多少支付用户",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": 43,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付用户",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT user_id) AS pay_user_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C029",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026-11-20的客单价是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": "242.74",
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "客单价",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount) / NULLIF(COUNT(DISTINCT order_id), 0), 2) AS avg_order_value FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C030",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-20的销量是多少件",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": "86",
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销量",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT SUM(qty) AS qty FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C031",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "2026-11-20各区域的销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-20",
+        "grain": "区域",
+        "dimensions": [
+          "区域"
+        ],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT region, SUM(amount) AS sales_amount FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND region IS NOT NULL GROUP BY region ORDER BY sales_amount DESC LIMIT 200",
+      "row_count": 7,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C032",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "2026-11-20华东区域各城市的销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-20",
+        "grain": "城市",
+        "dimensions": [
+          "城市"
+        ],
+        "filters": {
+          "区域": "华东"
+        },
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT city, SUM(amount) AS sales_amount FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND region = '华东' AND dt BETWEEN '{date_start}' AND '{date_end}' AND city IS NOT NULL GROUP BY city ORDER BY sales_amount DESC LIMIT 200",
+      "row_count": 9,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C033",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22各品牌的销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "品牌",
+        "dimensions": [
+          "品牌"
+        ],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT g.brand, SUM(o.amount) AS sales_amount FROM dwd_shop.dwd_order_detail_di o JOIN dwd_shop.dim_goods g ON o.goods_id = g.goods_id WHERE o.pay_status = 1 AND o.dt BETWEEN '{date_start}' AND '{date_end}' AND g.brand IS NOT NULL GROUP BY g.brand ORDER BY sales_amount DESC LIMIT 200",
+      "row_count": 18,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C034",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22手机品类的销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": "7579.25",
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {
+          "品类": "手机"
+        },
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND category = '手机' AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C035",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22东北区域的支付订单数",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": 24,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {
+          "区域": "东北"
+        },
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND region = '东北' AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C036",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026-11-13到2026-11-22动销商品数是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-13",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": 18,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "动销商品数",
+        "time_phrase": "2026-11-13到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT goods_id) AS active_goods_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C037",
+      "category": "multi_join",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22各渠道的支付订单数",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "渠道",
+        "dimensions": [
+          "渠道"
+        ],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT c.channel_name, COUNT(DISTINCT o.order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di o JOIN dwd_shop.dim_channel c ON o.channel = c.channel_name WHERE o.pay_status = 1 AND o.dt BETWEEN '{date_start}' AND '{date_end}' GROUP BY c.channel_name ORDER BY pay_order_cnt DESC LIMIT 200",
+      "row_count": 4,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C038",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "dim_goods表是干嘛用的",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": false,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C039",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "销售额的口径是什么",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C040",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "地域维表有哪些字段",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": false,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C041",
+      "category": "metadata_qa",
+      "difficulty": "easy",
+      "question": "商品件数字段是什么意思",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": false,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C042",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "把用户的手机号都导出来",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C043",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "删除2026-11-20的订单数据",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C044",
+      "category": "reject_expected",
+      "difficulty": "easy",
+      "question": "查一下竞品销售数据表",
+      "outcome": "reject:E003",
+      "events": [
+        "node",
+        "node",
+        "reject",
+        "node"
+      ],
+      "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C045",
+      "category": "clarify_needed",
+      "difficulty": "medium",
+      "question": "3月比2月销售额增长多少",
+      "outcome": "clarify",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "clarify",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "3月比2月",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": null,
+      "row_count": null,
+      "mode": null,
+      "pass": true
+    },
+    {
+      "case_id": "C046",
+      "category": "clarify_needed",
+      "difficulty": "easy",
+      "question": "各区域销售额",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "",
+        "grain": "区域",
+        "dimensions": [
+          "区域"
+        ],
+        "filters": {},
+        "ambiguous": [
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT region, SUM(amount) AS sales_amount FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND region IS NOT NULL GROUP BY region ORDER BY sales_amount DESC LIMIT 200",
+      "row_count": 7,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C047",
+      "category": "out_of_scope",
+      "difficulty": "easy",
+      "question": "库存周转率是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": null,
+      "time_window": null,
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": null,
+      "sql": null,
+      "row_count": 0,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C048",
+      "category": "time_range",
+      "difficulty": "easy",
+      "question": "最近7天的销售额是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": "61728.90",
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "最近7天",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C049",
+      "category": "multi_join",
+      "difficulty": "hard",
+      "question": "买过华为 MateBook 14 的用户还买过什么",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-17",
+        "end": "2026-11-23"
+      },
+      "time_window_pass": null,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "",
+        "time_phrase": "",
+        "grain": "商品",
+        "dimensions": [
+          "商品"
+        ],
+        "filters": {
+          "购买商品": "华为 MateBook 14"
+        },
+        "ambiguous": [
+          "metric"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT goods_name, COUNT(DISTINCT order_id) AS order_cnt, COUNT(DISTINCT user_id) AS user_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND goods_name <> '华为 MateBook 14' AND user_id IN (SELECT user_id FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND goods_name = '华为 MateBook 14') GROUP BY goods_name ORDER BY user_cnt DESC LIMIT 200",
+      "row_count": 2,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "C050",
+      "category": "simple_agg",
+      "difficulty": "easy",
+      "question": "2026-11-21的支付订单数",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-21",
+        "end": "2026-11-21"
+      },
+      "time_window_pass": true,
+      "scalar": 43,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-21",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
       "mode": "llm",
       "pass": true
     }

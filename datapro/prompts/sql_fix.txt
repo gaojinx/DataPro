@@ -1,13 +1,38 @@
-# version: v0
-# changelog: 2026-11-20 初版骨架
+# version: v2
+# changelog:
+#   2026-11-25 v2 注入用户长期记忆（{memories}）与历史成功规范（{learned}），修正时仅作参考、口径优先
+#   2026-11-24 v1 接入真实 LLM 修正回路：补充问题/规格/时间窗/表结构/口径/示例与重试提示
+#   2026-11-20 v0 初版骨架
 ## 任务
-上一次生成的 SQL 未通过校验，请根据错误信息修正。
+上一次生成的 SQL 未通过校验。请在保留原查询意图的前提下修正，只输出一条只读 SELECT。
 
 ## 待修正 SQL
 {sql}
 
-## 校验错误
+## 校验错误（必须逐条修正）
 {retry_errors}
 
+## 上下文
+- 用户问题：{question}
+- 查询规格（IR）：{spec}
+- 时间窗：{time_window}
+- 可用表结构：{recalled_schemas}
+- 相关指标口径：{calibers}
+- 用户长期偏好/约定（仅作参考，与口径冲突时以口径为准）：{memories}
+- 用户历史成功规范（同题复用参考）：{learned}
+
+## 参考写法（同形状，仅供结构参考，字段名以「可用表结构」为准）
+{examples}
+
+## 修正要求
+1. 只改导致校验失败的部分，不要顺手改写指标、时间窗或维度。
+2. 字段必须来自「可用表结构」，未列出的字段视为不存在，不得臆造。
+3. 时间条件只写 `dt BETWEEN '{date_start}' AND '{date_end}'`，禁止字面量日期与日期函数。
+4. 必须带 LIMIT，默认 200；MySQL 8.0 方言，禁止 `date_trunc`/`to_char` 等非 MySQL 函数。
+5. 若错误无法修复（如所需表/字段确实不存在），输出 `{"sql": null, "need_info": "原因"}`。
+
+## 重试提示
+{retry_hint}
+
 ## 输出 JSON
-同 sql_gen 的输出格式。若错误无法修复（如表不存在），confidence=low。
+{"sql": "SELECT ...", "explanation": "一句话：查什么范围、什么口径、什么粒度", "assumptions": ["最多 1 条"], "confidence": "high|low"}

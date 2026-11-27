@@ -1,0 +1,4 @@
+# POC 本地依赖与模型缓存，不提交
+.venv/
+.cache/
+__pycache__/

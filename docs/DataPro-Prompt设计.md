@@ -52,8 +52,13 @@
 1. 优先使用口径库中的 logic，不要重新解释指标。
 2. 必须带时间条件（用户未说则默认最近 7 天，并在 assumptions 中说明）。
 3. 必须带 LIMIT，默认 200。
-4. 时间条件禁止硬编码当前日期，使用占位符 {date}，由执行引擎注入。
+4. 时间条件禁止硬编码当前日期，使用占位符，由执行引擎注入：
+   - `{date}`：昨天（T-1，日报表最新分区）
+   - `{start_date}` / `{end_date}`：最近 7 天区间（T-7 ~ T-1）
 5. 禁止：任何写操作、查询检索结果之外的表、无 LIMIT 的全表扫描。
+6. **MySQL 8.0 方言约束**（v1 新增）：只允许 MySQL 函数（`DATE_SUB`/`DATE_FORMAT`/`WEEK` 等）；
+   禁止 `date_trunc`、`date_part`、`generate_series`、`to_char`、`to_date` 等 PostgreSQL 函数，
+   禁止 `INTERVAL '7' DAY` 引号写法（MySQL 为 `INTERVAL 7 DAY`，区间优先用占位符）。
 
 ## 输出 JSON
 {
@@ -75,7 +80,7 @@ confidence=low 时不要输出 sql，输出 NEED_INFO。
 
 - 只描述数据：总数、趋势方向、TOP 分布、异常值
 - **禁止**：业务归因（"因为促销所以上涨"）、建议、预测
-- 固定结尾："以上为 AI 生成结果，重要决策请人工复核。"
+- 结尾不附加免责声明（2026-11-23 按产品要求移除固定结尾）
 
 ### 3.4 reject.txt 要点
 

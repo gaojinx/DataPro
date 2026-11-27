@@ -9,11 +9,15 @@ dependencies = [
     "pydantic-settings>=2.0",
     "sqlglot>=25.0",
     "sqlalchemy>=2.0",
+    "alembic>=1.13",
     "pymysql>=1.1",
     "redis>=5.0",
     "openai>=1.40",
     "apscheduler>=3.10",
+    "langfuse>=3.0",           # 可观测（可选，未配 Key 时 no-op）
     "cryptography>=42.0",  # pymysql caching_sha2_password 需要
+    "openpyxl>=3.1",       # XLSX 解析（元数据模板 / 先知导出报表）
+    "playwright>=1.40",    # 路线 A：先知站点登录与导出；装包后需 playwright install chromium
 ]
 
 [project.optional-dependencies]

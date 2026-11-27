@@ -6,15 +6,53 @@ __pycache__/
 venv/
 .pytest_cache/
 .pytest_tmp/
+.pytest_*/
 
 # Node / 构建产物
 node_modules/
 dist/
 .tmp/
 
-# 运行时数据与密钥（含上传文件、API Key 注册表）
-datapro/data/
+# ---------- 密钥与凭据（严禁提交） ----------
+# 环境变量文件：忽略所有 .env / .env.* 变体，只保留示例文件
 .env
+.env.*
+!.env.example
+!*.env.example
+
+# 运行期密钥注册表（LLM API Key、上传文件等全部在 data/ 下）
+datapro/data/
+
+# K8s Secret：由 secret.example.yaml 复制生成，禁止入库
+ops/k8s/secret.yaml
+ops/k8s/*-secret.yaml
+ops/k8s/*.secret.yaml
+!ops/k8s/secret.example.yaml
+
+# 私钥与证书容器
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+id_ecdsa*
+
+# 云厂商 / 服务账号凭据
+credentials.json
+service-account*.json
+*-credentials.json
+gcloud-key*.json
+.kube/config
+
+# 本地密钥类配置
+.netrc
+.pgpass
+.my.cnf
+
+# ---------- 运行时与其他 ----------
 *.log
 
 # 独立演示项目（如需纳入仓库请删除此行）
@@ -24,3 +62,12 @@ univer-demo/
 .DS_Store
 Thumbs.db
 .screenshots/
+
+# 前端构建临时目录（esbuild/node 编译缓存，构建后可能因占用无法立即删除）
+.tmp_build*/
+.tmp_b*/
+.pytest_*/
+
+# 本地向量编码器产物（OpenVINO IR + tokenizer，数百 MB，进制品库不进 git）
+datapro/models/
+*.onnx

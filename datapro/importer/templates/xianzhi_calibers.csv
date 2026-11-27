@@ -1,0 +1,7 @@
+﻿metric_id,metric_name,aliases,definition,logic,source_table,choice_keywords,owner,status
+M901,先知账面消耗,"消耗,花费,成本,广告消耗,先知消耗,账面花费",先知平台当日账面消耗合计,SUM(account_cost) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,代理商,引流课,落地页,bilibili,B站",,active
+M902,先知引流课报名人数,"报名,报名人数,报名数,引流课报名,线索,留资",先知平台当日引流课报名人数合计,SUM(lead_signups) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,引流课,报名",,active
+M903,先知展示量,"曝光,展示,曝光量,展示量",先知平台当日展示合计,SUM(impressions) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,引流课,B站",,active
+M904,先知点击量,"点击,点击量,点击数",先知平台当日点击合计,SUM(clicks) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,引流课,B站",,active
+M905,先知引流课报名成本,"报名成本,获客成本,CPA",源端给出的引流课报名成本合计,SUM(lead_signup_cost) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,引流课",,active
+M906,先知登录用户数,"登录用户,登录人数",先知平台当日登录用户数合计,SUM(login_users) WHERE dt='{date}',dwd_shop.ods_xianzhi_info_analysis,"先知,引流课",,active

@@ -1,51 +1,55 @@
 """会话活跃登记（S07）：记录最后活跃时间，供定期回收会话 DB 账号与临时表。
 
-说明：注册表为进程内存 + JSON 持久化；多副本部署时需改为 Redis/数据库共享状态。
+多实例加固：每次读按 mtime 指纹失效缓存，touch/remove 走跨进程文件锁内的
+read-modify-write，避免 worker 持有旧快照误删仍在活跃的会话。
 """
-import json
-import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.services import file_store as fs
+from app.services.shared_json import SharedJson
 
 
 class SessionRegistry:
     def __init__(self, path: Path | None = None):
-        self._lock = threading.Lock()
         self._path = path or (fs.ROOT / "sessions.json")
-        self._data: dict[str, str] = {}
-        if self._path.exists():
-            try:
-                self._data = json.loads(self._path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                self._data = {}
-
-    def _persist(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(self._data, ensure_ascii=False, indent=2), encoding="utf-8")
+        self._store = SharedJson(self._path, default={})
 
     def touch(self, session_id: str) -> None:
         if not session_id:
             return
-        with self._lock:
-            self._data[session_id] = datetime.now().isoformat(timespec="seconds")
-            self._persist()
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._store.edit() as data:
+            data[session_id] = now
 
     def expired(self, ttl_hours: int) -> list[str]:
         cutoff = datetime.now() - timedelta(hours=ttl_hours)
-        with self._lock:
-            return [sid for sid, ts in self._data.items()
-                    if datetime.fromisoformat(ts) < cutoff]
+        data = self._store.snapshot()
+        expired = []
+        for sid, ts in data.items():
+            try:
+                if datetime.fromisoformat(ts) < cutoff:
+                    expired.append(sid)
+            except (ValueError, TypeError):
+                expired.append(sid)  # 损坏时间戳保守按过期处理，但 DROP 前有二次校验
+        return expired
 
     def remove(self, session_id: str) -> None:
-        with self._lock:
-            if self._data.pop(session_id, None) is not None:
-                self._persist()
+        with self._store.edit() as data:
+            data.pop(session_id, None)
 
     def all(self) -> dict[str, str]:
-        with self._lock:
-            return dict(self._data)
+        return dict(self._store.snapshot())
+
+    def recheck_active(self, session_id: str, ttl_hours: int) -> bool:
+        """DROP 前二次校验：重新读文件确认会话确实已过期。"""
+        ts = self._store.snapshot().get(session_id)
+        if not ts:
+            return False
+        try:
+            return datetime.fromisoformat(ts) >= datetime.now() - timedelta(hours=ttl_hours)
+        except (ValueError, TypeError):
+            return True  # 时间戳异常时保守不删
 
 
 session_registry = SessionRegistry()

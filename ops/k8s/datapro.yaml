@@ -1,0 +1,255 @@
+# DataPro K8s 部署（I06）：namespace + configmap + api/worker/frontend + service + ingress + HPA
+# 前置：
+#   1) 构建并推送镜像：datapro-api:0.1.0、datapro-web:0.1.0（改成你的 registry 地址）
+#   2) 先创建 secret：kubectl apply -f ops/k8s/secret.example.yaml（替换成真实值）
+#   3) 数仓 dwd_shop 与业务库 datapro 需提前存在；本文件不创建 MySQL/Redis
+#   4) data 卷需 ReadWriteMany（API 多副本 + worker 共享上传/导出文件）；
+#      若集群只有 RWO，把 API 副本改为 1，或改用对象存储
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: datapro
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datapro-config
+  namespace: datapro
+data:
+  APP_ENV: production
+  APP_HOST: 0.0.0.0
+  APP_PORT: "8100"
+  INIT_DB_ON_STARTUP: "false"          # 由 initContainer 执行一次迁移
+  EXEC_MAX_CONCURRENCY: "20"
+  EXEC_ROW_LIMIT: "200"
+  EXEC_TIMEOUT_MS: "10000"
+  SCAN_GUARD_ENABLED: "true"
+  MAX_SCAN_ROWS: "2000000"
+  EXPORT_MAX_ROWS: "100000"
+  RATE_LIMIT_PER_MINUTE: "30"
+  METRICS_ENABLED: "true"
+  FEATURE_DATA_PRO_ENABLED: "true"
+  FEATURE_INSPECTION_ENABLED: "true"
+  WEB_SEARCH_ENABLED: "true"
+  LLM_MODEL: deepseek-flash
+  LLM_FALLBACK_MODEL: ""
+  VECTOR_RECALL_ENABLED: "false"
+  VECTOR_BACKEND: memory
+  CORS_ALLOW_ORIGINS: "https://datapro.example.com"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datapro-api
+  namespace: datapro
+  labels: { app: datapro-api }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: datapro-api }
+  template:
+    metadata:
+      labels: { app: datapro-api }
+    spec:
+      securityContext:            # PVC 首次挂载时把组权限设为 1000，保证 datapro 可写
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: migrate
+          image: datapro-api:0.1.0
+          command: ["python", "-c", "from app.db.session import init_db; init_db()"]
+          envFrom:
+            - configMapRef: { name: datapro-config }
+            - secretRef: { name: datapro-secrets }
+      containers:
+        - name: api
+          image: datapro-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8100 }
+          envFrom:
+            - configMapRef: { name: datapro-config }
+            - secretRef: { name: datapro-secrets }
+          volumeMounts:
+            - { name: data, mountPath: /app/data }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: datapro-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datapro-api
+  namespace: datapro
+spec:
+  selector: { app: datapro-api }
+  ports:
+    - { name: http, port: 8100, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datapro-worker
+  namespace: datapro
+  labels: { app: datapro-worker }
+spec:
+  replicas: 1                       # 巡检/调度为单实例语义，不要扩副本
+  selector:
+    matchLabels: { app: datapro-worker }
+  template:
+    metadata:
+      labels: { app: datapro-worker }
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: worker
+          image: datapro-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "worker.inspection_worker"]
+          envFrom:
+            - configMapRef: { name: datapro-config }
+            - secretRef: { name: datapro-secrets }
+          volumeMounts:
+            - { name: data, mountPath: /app/data }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: datapro-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: datapro-data
+  namespace: datapro
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests: { storage: 10Gi }
+  # storageClassName: nfs-client    # 按集群实际存储类填写
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datapro-web
+  namespace: datapro
+  labels: { app: datapro-web }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: datapro-web }
+  template:
+    metadata:
+      labels: { app: datapro-web }
+    spec:
+      containers:
+        - name: web
+          image: datapro-web:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 80 }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datapro-web
+  namespace: datapro
+spec:
+  selector: { app: datapro-web }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: datapro
+  namespace: datapro
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: datapro.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: datapro-web
+                port: { number: 80 }
+  # TLS 由 cert-manager 或集群证书管理：
+  # tls:
+  #   - hosts: [datapro.example.com]
+  #     secretName: datapro-tls
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: datapro-api
+  namespace: datapro
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: datapro-api
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: datapro-web
+  namespace: datapro
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: datapro-web
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

@@ -1,21 +1,46 @@
-# version: v0
-# changelog: 2026-11-20 初版骨架（详见 docs/DataPro-Prompt设计.md §3.1）
+# version: v7
+# changelog:
+#   2026-11-25 v7 注入用户长期记忆（{memories}）与匹配到的历史成功规范（{learned}），仅作参考、口径优先
+#   2026-11-24 v6 筛选值必须原样使用字段取值列表，禁止添加“区域/名称”等后缀
+#   2026-11-23 v5 few-shot 改为按查询形状检索注入（{examples}），新增结构化重试提示（{retry_hint}）
+#   2026-11-23 v4 引入语义中间表示：注入 {spec}（指标/时间/维度/粒度），生成只做翻译，按规格分组与汇总
+#   2026-11-23 v3 时间窗由服务端确定性解析后注入，模型只做翻译不做日期算术；占位符收敛为 {date_start}/{date_end}；增加字段存在性硬约束与 ir_echo 自检
+#   2026-11-23 v2 注入知识库术语参考（口径 logic 优先）；v1 增加 MySQL 8.0 方言约束与日期占位符用法
 ## 任务
-根据用户问题生成一条只读 SELECT 查询。
+把【已确定的查询规格】翻译成一条只读 SELECT。
+规格（时间窗、指标口径、粒度、维度）已经确定，你只负责翻译，**不得改写指标、不得改变时间窗、不得增删维度**。
 
-## 输入
-- 用户问题：{question}（含澄清轮次拼接的完整上下文）
-- 可用表结构：{recalled_schemas}   # 只注入召回命中的表
-- 相关指标口径：{calibers}         # 口径 logic 优先于你的理解
-- 历史修正错误（如有）：{retry_errors}
+## 已确定的规格
+- 查询规格（IR）：{spec}
+- 用户问题：{question}
+- 时间窗：{time_window}
+- 可用表结构：{recalled_schemas}
+- 相关指标口径：{calibers}
+- 行业口径参考（知识库）：{knowledge}
+- 用户长期偏好/约定（仅作参考，与口径冲突时以口径为准）：{memories}
+- 用户历史成功规范（同题复用参考，字段以「可用表结构」为准）：{learned}
+
+## 参考写法（同形状，仅供结构参考，字段名以「可用表结构」为准）
+{examples}
 
 ## 要求
-1. 优先使用口径库中的 logic，不要重新解释指标。
-2. 必须带时间条件（用户未说则默认最近 7 天，并在 assumptions 中说明）。
-3. 必须带 LIMIT，默认 200。
-4. 时间条件禁止硬编码当前日期，使用占位符 {date}，由执行引擎注入。
-5. 禁止：任何写操作、查询检索结果之外的表、无 LIMIT 的全表扫描。
+1. 口径库 logic 优先，不要重新解释指标定义；口径里有的过滤条件（如 pay_status=1）必须保留。
+2. 时间条件只允许写成 `dt BETWEEN '{date_start}' AND '{date_end}'`；单日查询也写 BETWEEN（服务端会把起止填成同一天）。
+3. 禁止出现任何字面量日期、`CURDATE()`、`NOW()`、`DATE_SUB`、`INTERVAL`、`DATE_FORMAT` 拼日期——日期算术已由服务端完成，你自己算一定错。
+4. 分组必须与规格一致：规格有维度就 GROUP BY 该维度；规格是整体汇总（total）就不要 GROUP BY。
+5. 必须带 LIMIT，默认 200。
+6. 只使用「可用表结构」中列出的表与字段；未列出的字段视为不存在，不得臆造。
+7. 若规格缺少必要信息且无法从上下文推断，输出 `{"sql": null, "need_info": "缺少什么"}`，不要猜。
+8. 筛选值必须原样取自「可用表结构」的字段取值列表：例如 region 的取值是 `东北`，就只能写 `region = '东北'`，不得改写成“东北区域”“东北区”或其它变体。
+
+## 重试提示
+{retry_hint}
+上一次的错误（如有，必须修正）：{retry_errors}
+
+## 方言约束（MySQL 8.0，必须遵守）
+- 允许：`DATE_FORMAT`、`WEEK`、`YEARWEEK`、`CASE WHEN`、窗口函数、`NULLIF`。
+- 禁止 PostgreSQL/Oracle 函数：`date_trunc`、`date_part`、`generate_series`、`to_char`、`to_date`、`age`。
+- 禁止 `INTERVAL '7' DAY` 这类带引号的间隔写法。
 
 ## 输出 JSON
-{"sql": "SELECT ...", "explanation": "一句话解释查询逻辑", "assumptions": ["假设1"], "confidence": "high"}
-confidence=low 时不要输出 sql，输出 NEED_INFO。
+{"sql": "SELECT ...", "explanation": "一句话：查什么范围、什么口径、什么粒度", "assumptions": ["仅在规格缺失时填写，最多 1 条"], "ir_echo": {"metric": "指标原词", "time": "时间原词", "grain": "total|day|category"}, "confidence": "high"}

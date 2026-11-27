@@ -1,0 +1,71 @@
+{
+  "cases": 50,
+  "table_cases": 40,
+  "table_hits": 39,
+  "table_hit_rate": 0.975,
+  "caliber_cases": 25,
+  "caliber_hits": 23,
+  "caliber_hit_rate": 0.92,
+  "by_category": {
+    "simple_agg": {
+      "cases": 17,
+      "table_cases": 17,
+      "table_hits": 16,
+      "caliber_cases": 13,
+      "caliber_hits": 12
+    },
+    "multi_join": {
+      "cases": 10,
+      "table_cases": 10,
+      "table_hits": 10,
+      "caliber_cases": 6,
+      "caliber_hits": 5
+    },
+    "time_range": {
+      "cases": 2,
+      "table_cases": 2,
+      "table_hits": 2,
+      "caliber_cases": 1,
+      "caliber_hits": 1
+    },
+    "clarify_needed": {
+      "cases": 6,
+      "table_cases": 6,
+      "table_hits": 6,
+      "caliber_cases": 3,
+      "caliber_hits": 3
+    },
+    "metadata_qa": {
+      "cases": 7,
+      "table_cases": 5,
+      "table_hits": 5,
+      "caliber_cases": 2,
+      "caliber_hits": 2
+    }
+  },
+  "misses": [
+    {
+      "case_id": "C024",
+      "question": "按品类拆分一下",
+      "missing_calibers": [
+        "M003"
+      ],
+      "got_calibers": []
+    },
+    {
+      "case_id": "C025",
+      "question": "那11月16日到11月22日呢",
+      "missing_tables": [
+        "dwd_order_detail_di"
+      ]
+    },
+    {
+      "case_id": "C025",
+      "question": "那11月16日到11月22日呢",
+      "missing_calibers": [
+        "M003"
+      ],
+      "got_calibers": []
+    }
+  ]
+}

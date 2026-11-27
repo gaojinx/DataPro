@@ -1,0 +1,50 @@
+[
+  {
+    "id": "fs_total_count",
+    "grain": "total",
+    "metric": "count",
+    "tables": ["dwd_order_detail_di"],
+    "question": "昨天支付订单数",
+    "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200"
+  },
+  {
+    "id": "fs_total_sum",
+    "grain": "total",
+    "metric": "sum",
+    "tables": ["dwd_order_detail_di"],
+    "question": "上周销售额",
+    "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200"
+  },
+  {
+    "id": "fs_total_avg",
+    "grain": "total",
+    "metric": "avg",
+    "tables": ["dwd_order_detail_di"],
+    "question": "客单价",
+    "sql": "SELECT ROUND(SUM(amount) / NULLIF(COUNT(DISTINCT order_id), 0), 2) AS avg_order_value FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200"
+  },
+  {
+    "id": "fs_time_series",
+    "grain": "time",
+    "metric": "count",
+    "tables": ["dwd_order_detail_di"],
+    "question": "最近7天每天的支付订单数",
+    "sql": "SELECT dt, COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' GROUP BY dt ORDER BY dt LIMIT 200"
+  },
+  {
+    "id": "fs_dim_group",
+    "grain": "dim",
+    "metric": "count",
+    "tables": ["dwd_order_detail_di"],
+    "question": "本周每个品类的销量",
+    "sql": "SELECT category, COUNT(*) AS sales_volume FROM dwd_shop.dwd_order_detail_di WHERE dt BETWEEN '{date_start}' AND '{date_end}' AND category IS NOT NULL GROUP BY category ORDER BY sales_volume DESC LIMIT 200"
+  },
+  {
+    "id": "fs_dim_join",
+    "grain": "dim",
+    "metric": "count",
+    "tables": ["dwd_order_detail_di", "dim_channel"],
+    "question": "各渠道的支付订单数",
+    "sql": "SELECT c.channel_name, COUNT(DISTINCT o.order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di o JOIN dwd_shop.dim_channel c ON o.channel = c.channel_name WHERE o.pay_status = 1 AND o.dt BETWEEN '{date_start}' AND '{date_end}' GROUP BY c.channel_name ORDER BY pay_order_cnt DESC LIMIT 200"
+  }
+]

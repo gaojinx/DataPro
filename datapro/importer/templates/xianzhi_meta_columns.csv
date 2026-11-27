@@ -1,0 +1,16 @@
+﻿db_name,table_name,col_name,cn_name,data_type,caliber_id,is_pii,sample_values,common_pitfalls
+dwd_shop,ods_xianzhi_info_analysis,dt,投放日期,DATE,,false,2026-11-27,源端日期；相对窗口锚点见方案 §5.4
+dwd_shop,ods_xianzhi_info_analysis,account_name,投放账户名称,VARCHAR(128),,false,高途高中班课-高途教育-带货起飞sx-01,-- 表示源端空值已归一为空串
+dwd_shop,ods_xianzhi_info_analysis,media,媒体,VARCHAR(64),,false,bilibili app（b站）,保留原文不做枚举归一
+dwd_shop,ods_xianzhi_info_analysis,plan_name,投放计划名称,VARCHAR(255),,false,【智投】11.19-低分段逆袭-BV1RKVM67EYQ-表单,-- 表示源端空值已归一为空串
+dwd_shop,ods_xianzhi_info_analysis,landing_page_name,落地页名称,VARCHAR(255),,false,高中-0元- B站-首选-wyw,-- 表示源端空值已归一为空串；是幂等键一部分
+dwd_shop,ods_xianzhi_info_analysis,plan_id,投放计划ID,VARCHAR(64),,false,922222659,字符串；0 是合法值不可当 NULL
+dwd_shop,ods_xianzhi_info_analysis,impressions,展示,"BIGINT UNSIGNED",,false,231,NULL 表示源端未给、0 表示源端明确为 0
+dwd_shop,ods_xianzhi_info_analysis,clicks,点击,"BIGINT UNSIGNED",,false,11,NULL 表示源端未给、0 表示源端明确为 0
+dwd_shop,ods_xianzhi_info_analysis,account_cost,账面消耗,"DECIMAL(18,4)",M901,false,7.6300,与 dwd_campaign_daily.cost 口径不同不可直接对比或相加
+dwd_shop,ods_xianzhi_info_analysis,login_users,登录用户数,"INT UNSIGNED",M906,false,0,NULL 表示源端未给、0 表示源端明确为 0
+dwd_shop,ods_xianzhi_info_analysis,lead_signups,引流课报名人数,"INT UNSIGNED",M902,false,0,高一/二/三是其拆分不可与总报名数相加
+dwd_shop,ods_xianzhi_info_analysis,lead_signup_cost,引流课报名成本,"DECIMAL(18,4)",M905,false,0.0000,源端给定值勿用账面消耗除以报名人数覆盖
+dwd_shop,ods_xianzhi_info_analysis,grade1_signups,高一引流课报名人数,"INT UNSIGNED",,false,0,年级拆分维度
+dwd_shop,ods_xianzhi_info_analysis,grade2_signups,高二引流课报名人数,"INT UNSIGNED",,false,0,年级拆分维度
+dwd_shop,ods_xianzhi_info_analysis,grade3_signups,高三引流课报名人数,"INT UNSIGNED",,false,0,年级拆分维度

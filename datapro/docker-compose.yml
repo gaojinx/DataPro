@@ -1,32 +1,68 @@
-# MVP 部署拓扑（HLD §8）：MVP 只起 mysql + redis，api/worker 本地跑；
-# 扩量时启用 milvus 全家桶（需 etcd+minio，见 milvus 官方 compose）
+# DataPro 本地容器编排（MVP）：mysql + redis + api + worker + frontend
+# 说明：数仓 dwd_shop 与测试数据不在镜像内，首次启动后需按 AGENTS.md 初始化/导入；
+#      真实密钥放 .env（已 gitignore），不要把密钥写进 compose。
 services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: root_dev_only
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_only}
       MYSQL_DATABASE: datapro
       MYSQL_USER: datapro
-      MYSQL_PASSWORD: datapro_dev
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-datapro_dev}
     ports: ["3306:3306"]
-    volumes: ["datapro_mysql:/var/lib/mysql"]
+    volumes:
+      - "datapro_mysql:/var/lib/mysql"
+      # 首次启动创建第二个库 datapro_source 并授权（仅空数据卷时执行）
+      - "../ops/mysql/init:/docker-entrypoint-initdb.d:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
-  # api:
-  #   build: .
-  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8100
-  #   env_file: .env
-  #   ports: ["8100:8100"]
-  #   depends_on: [mysql, redis]
+  api:
+    build: { context: ., dockerfile: Dockerfile }
+    image: datapro-api:0.1.0
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]
+    env_file: .env
+    environment:
+      APP_DATABASE_URL: mysql+pymysql://datapro:${MYSQL_PASSWORD:-datapro_dev}@mysql:3306/datapro
+      SOURCE_DATABASE_URL: mysql+pymysql://datapro:${MYSQL_PASSWORD:-datapro_dev}@mysql:3306/datapro_source
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8100:8100"]
+    volumes: ["./data:/app/data"]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
-  # worker:
-  #   build: .
-  #   command: python -m worker.inspection_worker
-  #   env_file: .env
-  #   depends_on: [mysql, redis]
+  worker:
+    build: { context: ., dockerfile: Dockerfile }
+    image: datapro-api:0.1.0
+    command: ["python", "-m", "worker.inspection_worker"]
+    env_file: .env
+    environment:
+      APP_DATABASE_URL: mysql+pymysql://datapro:${MYSQL_PASSWORD:-datapro_dev}@mysql:3306/datapro
+      SOURCE_DATABASE_URL: mysql+pymysql://datapro:${MYSQL_PASSWORD:-datapro_dev}@mysql:3306/datapro_source
+      REDIS_URL: redis://redis:6379/0
+    volumes: ["./data:/app/data"]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    image: datapro-web:0.1.0
+    ports: ["8080:80"]
+    depends_on: [api]
 
 volumes:
   datapro_mysql:

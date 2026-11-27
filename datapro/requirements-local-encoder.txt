@@ -1,0 +1,12 @@
+# 本地编码器（VECTOR_ENCODER=local）的**运行**依赖。
+#
+# 只装这几个就够跑向量召回；转换模型需要额外的 torch + optimum-intel，
+# 那部分只在开发机/CI 执行一次，见 importer/export_encoder.py 顶部注释。
+#
+# 安装：
+#   pip install -r requirements-local-encoder.txt
+#
+# 版本为下限、不锁死：具体兼容矩阵以 OpenVINO / Transformers 官方发布说明为准。
+openvino>=2024.4
+transformers>=4.40
+numpy>=1.24

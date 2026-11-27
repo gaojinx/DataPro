@@ -1,0 +1,2 @@
+﻿db_name,table_name,cn_name,granularity,update_freq,owner,dt_level,description,keywords,priority,status
+dwd_shop,ods_xianzhi_info_analysis,先知代理商投放明细日表,一行 = 某投放日期 × 某计划ID × 某媒体 × 某落地页的投放表现,每日 T+1 06:30（Asia/Shanghai）回看 3 天,,L2,先知-代理商系统导出的投放数据；含账户/媒体/落地页/展示/点击/账面消耗/登录用户/引流课报名及高一二三拆分。与 dwd_campaign_daily 不同：本表是引流课投放明细、含落地页与年级维度；问先知/代理商/引流课/落地页/B站优先用本表、问通用投放 ROI 用 dwd_campaign_daily,"先知,代理商,引流课,落地页,B站,bilibili,投放账户,报名人数",P1,active

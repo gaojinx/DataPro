@@ -1,0 +1,16 @@
+﻿src_field,col_name,data_type,transform,required,comment
+投放日期,dt,DATE,date_parse,true,源端日期，YYYY-MM-DD
+投放账户名称,account_name,VARCHAR(128),dash_to_null,false,空值归一为空串
+媒体,media,VARCHAR(64),dash_to_null,true,保留原文，不做枚举归一
+投放计划名称,plan_name,VARCHAR(255),dash_to_null,false,空值归一为空串
+落地页名称,landing_page_name,VARCHAR(255),dash_to_null,true,幂等键一部分；-- 归一为空串
+投放计划ID,plan_id,VARCHAR(64),trim_number,true,按字符串保留，0 是合法值
+展示,impressions,"BIGINT UNSIGNED",trim_number,false,空值为 NULL，0 为源端明确为 0
+点击,clicks,"BIGINT UNSIGNED",trim_number,false,空值为 NULL
+账面消耗,account_cost,"DECIMAL(18,4)",trim_number,false,与 dwd_campaign_daily.cost 口径不同
+登录用户数,login_users,"INT UNSIGNED",trim_number,false,空值为 NULL
+引流课报名人数,lead_signups,"INT UNSIGNED",trim_number,false,高一/二/三是拆分，不可与总数相加
+引流课报名成本,lead_signup_cost,"DECIMAL(18,4)",trim_number,false,源端给定值，勿用消耗/报名自行相除
+高一引流课报名人数,grade1_signups,"INT UNSIGNED",trim_number,false,年级拆分维度
+高二引流课报名人数,grade2_signups,"INT UNSIGNED",trim_number,false,年级拆分维度
+高三引流课报名人数,grade3_signups,"INT UNSIGNED",trim_number,false,年级拆分维度

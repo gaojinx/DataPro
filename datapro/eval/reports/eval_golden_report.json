@@ -1,0 +1,165 @@
+{
+  "dataset": "eval_golden",
+  "total": 3,
+  "metrics": {
+    "executable_rate": 1.0,
+    "overall_pass_rate": 1.0,
+    "table_hit_rate": 1.0,
+    "time_window_pass_rate": 1.0,
+    "result_match_rate": 1.0,
+    "false_answer_rate": 0.0,
+    "must_not_pass_rate": 1.0,
+    "table_overflow_rate": 0.0,
+    "llm_mode_cases": 3,
+    "degraded_cases": 0
+  },
+  "by_category": {
+    "simple_agg": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "failure_breakdown": {},
+  "table_overflow": [],
+  "passed": 3,
+  "details": [
+    {
+      "case_id": "G001",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "2026-11-16到2026-11-22的销售额合计是多少",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-16",
+        "end": "2026-11-22"
+      },
+      "time_window_pass": true,
+      "scalar": "72470.55",
+      "result_pass": true,
+      "must_not_pass": true,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "销售额",
+        "time_phrase": "2026-11-16到2026-11-22",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT ROUND(SUM(amount), 2) AS gmv FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "G002",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "按品类拆分一下",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": null,
+      "result_pass": null,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": true,
+      "spec": {
+        "metric": "",
+        "time_phrase": "",
+        "grain": "品类",
+        "dimensions": [
+          "品类"
+        ],
+        "filters": {},
+        "ambiguous": [
+          "metric",
+          "time"
+        ],
+        "source": "llm"
+      },
+      "sql": "SELECT category, COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' AND category IS NOT NULL GROUP BY category ORDER BY pay_order_cnt DESC LIMIT 200",
+      "row_count": 5,
+      "mode": "llm",
+      "pass": true
+    },
+    {
+      "case_id": "G003",
+      "category": "simple_agg",
+      "difficulty": "medium",
+      "question": "查2026-11-20的支付订单数",
+      "outcome": "result",
+      "events": [
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "node",
+        "result",
+        "node"
+      ],
+      "table_hit": true,
+      "time_window": {
+        "start": "2026-11-20",
+        "end": "2026-11-20"
+      },
+      "time_window_pass": true,
+      "scalar": 43,
+      "result_pass": true,
+      "must_not_pass": null,
+      "note_pass": null,
+      "rows_pass": null,
+      "spec": {
+        "metric": "支付订单数",
+        "time_phrase": "2026-11-20",
+        "grain": "total",
+        "dimensions": [],
+        "filters": {},
+        "ambiguous": [],
+        "source": "llm"
+      },
+      "sql": "SELECT COUNT(DISTINCT order_id) AS pay_order_cnt FROM dwd_shop.dwd_order_detail_di WHERE pay_status = 1 AND dt BETWEEN '{date_start}' AND '{date_end}' LIMIT 200",
+      "row_count": 1,
+      "mode": "llm",
+      "pass": true
+    }
+  ]
+}

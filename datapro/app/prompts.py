@@ -25,6 +25,11 @@ def prompt_version(name: str) -> str:
     return "unknown"
 
 
+def load_prompt(name: str) -> str:
+    """读取 prompt 原文（用于旁路任务，不追加检索结果块）。"""
+    return _load(name)
+
+
 SYSTEM_COMMON = (
     "你是 DataPro，企业内部数据管家。\n"
     "规则（违反任何一条即失败）：\n"
@@ -37,6 +42,10 @@ SYSTEM_COMMON = (
 
 def render_prompt(name: str, variables: dict[str, str]) -> str:
     text = _load(name)
+    has_schema_slot = "{recalled_schemas}" in text
     for key, value in variables.items():
         text = text.replace("{" + key + "}", value)
-    return f"{text}\n\n## 检索结果\n可见表: {variables.get('recalled_schemas', '无')}"
+    # 模板未显式声明表结构槽位时，统一追加到末尾，保证模型总能看到可用表
+    if not has_schema_slot:
+        text = f"{text}\n\n## 检索结果\n可见表: {variables.get('recalled_schemas', '无')}"
+    return text
