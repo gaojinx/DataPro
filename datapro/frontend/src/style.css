@@ -2631,6 +2631,11 @@ button:focus:not(:focus-visible), textarea:focus:not(:focus-visible) { outline: 
   border-radius: 4px;
 }
 .fav-del:hover { color: var(--danger); background: var(--bg-hover); }
+.fav-fill {
+  border: 0; background: transparent; color: var(--faint);
+  cursor: pointer; padding: 4px; border-radius: 4px; display: inline-flex;
+}
+.fav-fill:hover { color: var(--accent); background: var(--bg-hover); }
 
 /* 应用内帮助 */
 .help-grid {
